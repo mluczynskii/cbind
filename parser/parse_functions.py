@@ -74,6 +74,10 @@ def simplify_dict(d):
             })
     return new_dict
 
+def validate_file(file):
+    skip_empty(file)
+    return re.search("^;; Function", peek_line(file)) != None
+
 def run_parser(file):
     file_size = get_file_size(file)
     skip_empty(file)

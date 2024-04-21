@@ -84,7 +84,7 @@ class Function(Statement):
     def __str__(self):
         mod = self.modifier.value + ' ' if self.modifier else '';
         xs = map(str, self.args);
-        declaration = f'{mod}{self.return_type} {self.name}({', '.join(xs)})';
+        declaration = f'{mod}{self.return_type} {self.name}({", ".join(xs)})';
         if self.content:
             return f'{declaration} {self.content} \n';
         else:
@@ -98,7 +98,7 @@ class FunctionCall(Statement):
 
     def __str__(self):
         xs = map(str, self.args);
-        return f'{self.name}({', '.join(xs)})' + (';' if self.last else '');
+        return f'{self.name}({", ".join(xs)})' + (';' if self.last else '');
 
 @dataclass
 class Return(Statement):

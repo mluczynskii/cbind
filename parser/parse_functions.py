@@ -60,18 +60,30 @@ def get_type_ids(d, node):
 
 def simplify_dict(d):
     new_dict = {}
-    new_dict["name"] = d["@0"][0]
-    new_dict["return_expr"] = {
-        "type": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:"]),
-        "type_name": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:", "name:", "name:", "strg:"]),
-        }
+    try:
+        new_dict["name"] = d["@0"][0]
+    except:
+        new_dict["name"] = None
+    try:
+        new_dict["return_expr"] = {
+            "type": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:"]),
+            "type_name": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:", "name:", "name:", "strg:"]),
+            }
+    except:
+        new_dict["return_expr"] = {
+            "type": None,
+            "type_name": None
+            }
     new_dict["args"] = []
     for k in get_type_ids(d, "parm_decl"):
-        new_dict["args"].append({
-            "name": resolve_path(d, k, ["name:", "strg:"]),
-            "type": d[retrieve_field(d, k, "type:")][0],
-            "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
-            })
+        try:
+            new_dict["args"].append({
+                "name": resolve_path(d, k, ["name:", "strg:"]),
+                "type": d[retrieve_field(d, k, "type:")][0],
+                "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
+                })
+        except:
+            pass
     return new_dict
 
 def validate_file(file):

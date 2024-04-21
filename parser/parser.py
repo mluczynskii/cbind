@@ -19,7 +19,7 @@ try:
 
     file = open(file_name, "r")
     if(not validate_file(file)):
-        raise Exception()
+        raise Exception("Invalid input file")
         #print("Invalid input file")
 
     res = json.dumps(run_parser(file))
@@ -29,9 +29,6 @@ try:
 
 except FileNotFoundError:
     print("Could not open:", file_name)
-    exit()
-except:
-    print("Invalid input file")
     exit()
 
 if not args.no_dump:

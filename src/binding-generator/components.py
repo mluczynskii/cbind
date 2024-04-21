@@ -44,6 +44,13 @@ class Block(Component):
     def merge(x, y):
         return Block(x.content + y.content);
 
+@dataclass
+class ListInitializer(Component):
+    values: list[str]
+
+    def __str__(self):
+        return '{\n' + ',\n'.join(self.values) +'\n};\n';
+
 # Variable declaration, ex. int x = 5;
 @dataclass
 class Variable(Statement):
@@ -61,7 +68,7 @@ class Variable(Statement):
         if self.array:
             declaration = declaration + '[]';
         final = declaration + (f' = {self.value}' if self.value else '');
-        if not isinstance(self.value, Block):
+        if not (isinstance(self.value, Block) or isinstance(self.value, ListInitializer)):
             final = final + ';';
         return final;
 
@@ -99,10 +106,3 @@ class Return(Statement):
 
     def __str__(self):
         return f'return {self.value}; \n';
-
-@dataclass
-class ListInitializer(Component):
-    values: list[str]
-
-    def __str__(self):
-        return ', '.join(self.values) +'\n';

@@ -86,9 +86,9 @@ def write_register(file, data):
         "luareg",
         True,
         modifier=Modifier.CONST,
-        value=Block([ListInitializer(xs)])
+        value=ListInitializer(xs)
     );
-    file.write(str(register) + ';\n');
+    file.write(str(register));
 
 def main():
     parser = argparse.ArgumentParser(

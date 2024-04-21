@@ -1,4 +1,5 @@
-code = """lua_State* L;
+code = """
+lua_State* L;
 
 int execScript(const char* filename) {
 	if (!L) return 1;

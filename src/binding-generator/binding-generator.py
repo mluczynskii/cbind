@@ -1,3 +1,4 @@
+# v0.0.2 - a lot of hacks...
 from components import *
 import json
 import argparse 
@@ -76,6 +77,19 @@ def write_wrappers(file, data):
 
         file.write(str(f) + '\n');
 
+def write_register(file, data):
+    xs = ['{' + f'"{fun["name"]}", c_{fun["name"]}' + '}' for fun in data];
+
+    register = Variable(
+        True,
+        "luaL_Reg",
+        "Api",
+        True,
+        modifier=Modifier.CONST,
+        value=Block([ListInitializer(xs)])
+    );
+    file.write(str(register) + ';');
+
 def main():
     parser = argparse.ArgumentParser(
         prog="binding-generator",
@@ -92,6 +106,7 @@ def main():
         write_boilerplate(output);
         write_declarations(output, data);
         write_wrappers(output, data);
+        write_register(output, data);
 
 if __name__ == '__main__':
     main();

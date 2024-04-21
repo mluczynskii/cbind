@@ -1,3 +1,5 @@
+# TODO: Fix indentation problems
+
 from abc import ABC
 from dataclasses import dataclass
 from typing import Optional
@@ -97,3 +99,10 @@ class Return(Statement):
 
     def __str__(self):
         return f'return {self.value}; \n';
+
+@dataclass
+class ListInitializer(Component):
+    values: list[str]
+
+    def __str__(self):
+        return ', '.join(self.values) +'\n';

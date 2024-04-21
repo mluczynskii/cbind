@@ -1,0 +1,1 @@
+print(CFunction.foo())

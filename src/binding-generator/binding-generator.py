@@ -1,4 +1,4 @@
-# v0.0.2 - a lot of hacks...
+# v0.0.4 - a lot of hacks...
 from components import *
 import json
 import argparse 
@@ -18,7 +18,7 @@ def load_info(filename):
 
 def write_headers(file):
     for header in [Include(h, True) for h in HEADERS]:
-        file.write(str(header)); 
+        file.write(str(header) + '\n'); 
     file.write('\n');
 
 def write_boilerplate(file):
@@ -38,6 +38,7 @@ def write_declarations(file, data):
         );
 
         file.write(str(f) + '\n');
+    file.write('\n');
 
 # TODO: So far it only works with functions returning int and taking int arguments
 def write_wrappers(file, data):
@@ -47,7 +48,6 @@ def write_wrappers(file, data):
         # int arg1 = lua_tonumber(L, 1); [...]
         prefix = Block([
             Variable(
-                False,
                 "int",
                 f'arg{i}',
                 False,
@@ -63,7 +63,7 @@ def write_wrappers(file, data):
         # lua_pushinteger(L, api_name(arg1, ..., argn));
         # return 1;
         suffix = Block([
-            FunctionCall('lua_pushinteger', ['L', apicall], last=True),
+            FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True),
             Return(1)
         ]);
 
@@ -75,20 +75,13 @@ def write_wrappers(file, data):
             content=Block.merge(prefix,suffix)
         );
 
-        file.write(str(f) + '\n');
+        file.write(str(f) + '\n\n');
 
 def write_register(file, data):
     xs = ['{' + f'"{fun["name"]}", c_{fun["name"]}' + '}' for fun in data];
 
-    register = Variable(
-        True,
-        "luaL_Reg",
-        "luareg",
-        True,
-        modifier=Modifier.CONST,
-        value=ListInitializer(xs)
-    );
-    file.write(str(register));
+    register = LuaRegister("luareg", xs);
+    file.write(str(register) + '\n');
 
 def main():
     parser = argparse.ArgumentParser(
@@ -106,6 +99,7 @@ def main():
         write_declarations(output, data);
         write_wrappers(output, data);
         write_register(output, data);
+        output.write("\n// Boilerplate code \n");
         write_boilerplate(output);
 
 if __name__ == '__main__':

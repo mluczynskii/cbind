@@ -26,35 +26,37 @@ class Include(Directive):
 
     def __str__(self):
         if self.user:
-            return f'#include "{self.name}" \n';
+            return f'#include "{self.name}"';
         else:
-            return f'#include <{self.name}> \n';
+            return f'#include <{self.name}>';
 
-# Code block, ex. { int x = 5; return x }
+# Code block, ex. { int x = 5; return x; }
 @dataclass 
 class Block(Component):
     content: list[Statement]
 
     def __str__(self):
         xs = map(str, self.content);
-        inside = '\n    '.join(xs);
-        return '{\n    ' + inside + '}\n';
+        inside = '\n'.join(xs);
+        return '{\n' + inside + '\n}';
 
     @staticmethod
     def merge(x, y):
         return Block(x.content + y.content);
 
 @dataclass
-class ListInitializer(Component):
+class LuaRegister(Statement):
+    name: str 
     values: list[str]
 
     def __str__(self):
-        return '{\n' + ',\n'.join(self.values) +'\n};\n';
+        declaration = f'const struct luaL_Reg {self.name}[]';
+        inside = ',\n'.join(self.values);
+        return declaration + ' = {\n' + inside + '\n};';
 
 # Variable declaration, ex. int x = 5;
 @dataclass
 class Variable(Statement):
-    struct: bool
     type_: str
     name: str
     array: bool
@@ -63,46 +65,42 @@ class Variable(Statement):
 
     def __str__(self):
         mod = self.modifier.value + ' ' if self.modifier else '';
-        prefix = mod + ('struct ' if self.struct else '');
-        declaration = f'{prefix}{self.type_} {self.name}';
+        declaration = mod + f'{self.type_} {self.name}';
         if self.array:
             declaration = declaration + '[]';
-        final = declaration + (f' = {self.value}' if self.value else '');
-        if not (isinstance(self.value, Block) or isinstance(self.value, ListInitializer)):
-            final = final + ';';
-        return final;
+        return declaration + (f' = {self.value};' if self.value else ';');
 
 # Function declaration, ex. int foo (int n);
 @dataclass
 class Function(Statement):
     return_type: str 
     name: str 
-    args: list[Variable]
+    args: list[str]
     modifier: Optional[Modifier] = None
     content: Optional[Block] = None
 
     def __str__(self):
         mod = self.modifier.value + ' ' if self.modifier else '';
         xs = map(str, self.args);
-        declaration = f'{mod}{self.return_type} {self.name}({", ".join(xs)})';
+        declaration = mod + f'{self.return_type} {self.name}({", ".join(xs)})';
         if self.content:
-            return f'{declaration} {self.content} \n';
+            return f'{declaration} {self.content}';
         else:
-            return f'{declaration}; \n';
+            return f'{declaration};';
 
 @dataclass
 class FunctionCall(Statement):
     name: str
     args: list[any]
-    last: Optional[bool] = False
+    semicolon: Optional[bool] = False
 
     def __str__(self):
         xs = map(str, self.args);
-        return f'{self.name}({", ".join(xs)})' + (';' if self.last else '');
+        return f'{self.name}({", ".join(xs)})' + (';' if self.semicolon else '');
 
 @dataclass
 class Return(Statement):
     value: any 
 
     def __str__(self):
-        return f'return {self.value}; \n';
+        return f'return {self.value};';

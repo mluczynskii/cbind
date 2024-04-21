@@ -18,13 +18,21 @@ res = None
 try:
 
     file = open(file_name, "r")
+    if(not validate_file(file)):
+        raise Exception()
+        #print("Invalid input file")
+
     res = json.dumps(run_parser(file))
     if args.verbose:
         print(res)
     file.close()
 
-except:
+except FileNotFoundError:
     print("Could not open:", file_name)
+    exit()
+except:
+    print("Invalid input file")
+    exit()
 
 if not args.no_dump:
     try:

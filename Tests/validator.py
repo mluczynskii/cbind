@@ -7,7 +7,7 @@ import glob
 
 TEST_DIRECTORY = "./test_cases/"
 SOURCE_DIRECTORY = "src"
-FILES_TO_KEEP = ['validator.py', 'test_cases', 'makefile', 'lua_binding_api.h', 'README.md']
+FILES_TO_KEEP = ['validator.py', 'test_cases', 'Makefile', 'lua_binding_api.h', 'README.md']
 PARSER_PATH = "../parser/parser.py"
 GENERATOR_PATH = "../src/binding-generator/binding-generator.py"
 BINDING_FILE_NAME = "binding.c"

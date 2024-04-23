@@ -18,7 +18,12 @@ VERBOSE = False
 
 def generate_AST(case):
     source_directory = os.path.join(TEST_DIRECTORY, case, SOURCE_DIRECTORY)
-    source_files = " ".join(os.path.join(source_directory, f) for f in os.listdir(source_directory) if f.endswith(".c"))
+    for file_name in os.listdir(source_directory):
+        source_file = os.path.join(source_directory, file_name)
+        if os.path.isfile(source_file):
+            shutil.copy(source_file, ".")
+
+    source_files = " ".join(os.path.join(".", f) for f in os.listdir(source_directory) if f.endswith(".c"))
     compile_command = f"gcc -S -fdump-tree-original-raw {source_files}"
     result = subprocess.run(compile_command, shell=True)
 
@@ -35,12 +40,6 @@ def compile_with_binding_error(result, message):
     return 1
 
 def compile_with_binding(case):
-    source_directory = os.path.join(TEST_DIRECTORY, case, SOURCE_DIRECTORY)
-    for file_name in os.listdir(source_directory):
-        source_file = os.path.join(source_directory, file_name)
-        if os.path.isfile(source_file):
-            shutil.copy(source_file, ".")
-
     c_files = glob.glob("*.c.005t.original")
     c_file_arguments = " ".join(c_files)
     

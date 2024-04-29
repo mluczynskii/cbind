@@ -4,13 +4,14 @@ This script is used to validate test cases for a program.
 
 ## Usage
 
-```bash
-python3 validator.py [-v] [-cases i j k]
+```
+python3 validator.py [-t {auto, manual}] [-v] [-cases i j k]
 ```
 ## Flags
 
 -v: Verbose mode. Shows detailed information about failed tests
 -cases i j k: Runs specific test cases (space-separated list)
+-t {auto, manual}: Test type: auto (unit tests) or manual (manual tests). Default: auto.
 
 ## Note
 

@@ -5,26 +5,32 @@ import argparse
 import shutil
 import glob
 
-TEST_DIRECTORY = "./test_cases/"
+TEST_DIRECTORY = "test_cases"
 SOURCE_DIRECTORY = "src"
 FILES_TO_KEEP = ['validator.py', 'test_cases', 'Makefile', 'lua_binding_api.h', 'README.md']
-PARSER_PATH = "../parser/parser.py"
+PARSER_PATH = "../src/parser/parser.py"
 GENERATOR_PATH = "../src/binding-generator/binding-generator.py"
+MANUAL_DIRECTORY = "manual"
+AUTO_DIRECTORY = "auto"
 BINDING_FILE_NAME = "binding.c"
 TESTING_FILE = "main"
 
-
 VERBOSE = False
 
-def generate_AST(case):
+# Copy C program source code from /test_cases/casei/src to the working directory
+def copy_src_code(case):
     source_directory = os.path.join(TEST_DIRECTORY, case, SOURCE_DIRECTORY)
     for file_name in os.listdir(source_directory):
         source_file = os.path.join(source_directory, file_name)
         if os.path.isfile(source_file):
             shutil.copy(source_file, ".")
 
-    source_files = " ".join(os.path.join(".", f) for f in os.listdir(source_directory) if f.endswith(".c"))
-    compile_command = f"gcc -S -fdump-tree-original-raw {source_files}"
+# Generating files with AST for every source file with the .c extension
+def generate_AST(case):
+    c_files = glob.glob("*.c")
+
+    # Using the -S flag with GCC to generate AST files without compilation; this avoids compilation errors caused by the lack of binding files
+    compile_command = f"gcc -S -fdump-tree-original-raw {' '.join(c_files)}"
     result = subprocess.run(compile_command, shell=True)
 
     if result.returncode == 0:
@@ -39,6 +45,7 @@ def compile_with_binding_error(result, message):
     print(result.stderr.decode())
     return 1
 
+# Make an executable file using the make program
 def compile_with_binding(case):
     c_files = glob.glob("*.c.005t.original")
     c_file_arguments = " ".join(c_files)
@@ -60,14 +67,13 @@ def compile_with_binding(case):
     
     return 0
 
-def run_case(case):
-    if(generate_AST(case)):
-        return 1
-    if(compile_with_binding(case)):
-        return 2
+def run_manual_test(case):
+    input_directory = os.path.join(TEST_DIRECTORY, case, MANUAL_DIRECTORY, "in")
+    output_directory = os.path.join(TEST_DIRECTORY, case, MANUAL_DIRECTORY, "out")
 
-    input_directory = os.path.join(TEST_DIRECTORY, case, "in")
-    output_directory = os.path.join(TEST_DIRECTORY, case, "out")
+    if not (os.path.exists(input_directory) and os.path.exists(output_directory)):
+        print(f"{case}: Manual test not found")
+        return 0
 
     failed_tests = []
 
@@ -99,7 +105,38 @@ def run_case(case):
     else:
         print("All tests passed!")
 
+def run_auto_test(case):
+    input_directory = os.path.join(TEST_DIRECTORY, case, AUTO_DIRECTORY)
 
+    if not os.path.exists(input_directory):
+        print(f"{case}: Auto test not found")
+        return 0
+
+    lua_scripts = [f for f in os.listdir(input_directory) if f.endswith(".lua")]
+
+    for script in lua_scripts:
+        script_path = os.path.join(input_directory, script)
+        
+        result = subprocess.run([f"./{TESTING_FILE}", script_path], capture_output=True, text=True)
+        
+        if result.stderr.strip() == "true":
+            print("Success")
+        else:
+            print("Error: Lua test script execution failed:")
+            print(result.stdout)
+
+def run_case(case, test_type):
+    copy_src_code(case)
+    if(generate_AST(case)):
+        return 1
+    if(compile_with_binding(case)):
+        return 2
+    if test_type == "manual":
+        run_manual_test(case)
+    else:
+        run_auto_test(case)
+
+# Remove test files from the working directory
 def cleanup_test_environment():
     all_files = os.listdir('.')
 
@@ -110,7 +147,7 @@ def cleanup_test_environment():
             elif os.path.isdir(file_name):
                 os.rmdir(file_name)
 
-def run_cases(selectedCases):
+def run_cases(selectedCases, test_type):
     if selectedCases == None:
         selectedCases = os.listdir("./test_cases")
 
@@ -118,21 +155,20 @@ def run_cases(selectedCases):
     cleanup_test_environment()
     for case in selectedCases:
         print(f"Running : {case}")
-        run_case(case)
+        run_case(case, test_type)
         cleanup_test_environment()
-
-
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run test cases.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed information about failed tests.")
     parser.add_argument("-cases", "--selected_cases", nargs="+", help="Run specific test cases (space-separated list).")
+    parser.add_argument("-t", "--test_type", choices=["auto", "manual"], default="auto", help="Test type: auto (unit tests) or manual (manual tests). Default: auto.")
     args = parser.parse_args()
 
     VERBOSE = args.verbose
 
     if args.selected_cases:
         selected_cases = [f"case{case}" for case in args.selected_cases]
-        run_cases(selected_cases)
+        run_cases(selected_cases, args.test_type)
     else:
-        run_cases(None)
+        run_cases(None, args.test_type)

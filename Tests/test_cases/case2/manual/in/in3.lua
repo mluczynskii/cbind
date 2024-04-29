@@ -1,0 +1,1 @@
+print(2 + CFunction.return_ten())

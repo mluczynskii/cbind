@@ -1,10 +1,10 @@
 #include "lua_binding_api.h"
 
-int bar(){
+int return_ten(){
     return 10;
 }
 
-int foo(int x){
+int square(int x){
     return x*x;
 }
 

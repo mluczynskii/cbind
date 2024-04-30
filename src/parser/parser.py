@@ -22,7 +22,7 @@ try:
         raise Exception("Invalid input file")
         #print("Invalid input file")
 
-    res = json.dumps(run_parser(file))
+    res = json.dumps(run_parser(file), indent=2)
     if args.verbose:
         print(res)
     file.close()

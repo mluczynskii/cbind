@@ -1,5 +1,5 @@
 # Path to Lua source files
-LUAPATH = ../../Lua/lua-5.4.6
+LUAPATH = ../lua-5.4.6
 
 all: binding.o main
 

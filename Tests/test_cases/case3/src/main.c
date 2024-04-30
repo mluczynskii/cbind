@@ -1,6 +1,7 @@
 #include "lua_binding_api.h"
 
 int apply(int a,  int (*f)(int)){
+    void *args[2] = {&a, f};
     return f(a);
 }
 
@@ -9,6 +10,7 @@ int execute(int (*f)()){
 }
 
 int inc_and_apply(int a,  int (*f)(int)){
+    void *args[2] = {&a, f};
     a++;
     return f(a);
 }

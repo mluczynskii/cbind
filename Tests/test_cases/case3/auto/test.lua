@@ -13,6 +13,7 @@ function test_apply()
             print("Test failed for apply function with callback inc(x),  input: " .. i)
             return false
         end
+
         if CFunction.apply(i, square) ~= i * i then
             print("Test failed for apply function with callback square(x), input: " .. i)
             return false

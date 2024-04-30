@@ -38,6 +38,9 @@ def parse_dict(d):
     return d
 
 def retrieve_field(d, node_id, field):
+    if field == "ptd:" or field == "ptd :":
+        return d[node_id][d[node_id].index("ptd") + 2]
+    else:
         return d[node_id][d[node_id].index(field) + 1]
 
 def retrieve_node(d, node_id):
@@ -58,6 +61,64 @@ def get_type_ids(d, node):
             res.append(k)
     return res
 
+def get_simple_type_entry(d, k):
+    return {
+                "name": resolve_path(d, k, ["name:", "strg:"]),
+                "type": d[retrieve_field(d, k, "type:")][0],
+                "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
+            }
+
+def collect_fptr_prms(d, k):
+    #if function_type has prms: then arguments
+    #are given on list of tree_list nodes, terminated by void_type
+    #else no parameters are present
+    #(d,k) -> type -> ptd -? 'prms' while tree_list has @chan
+    #neds to be checked
+    ptd_id = retrieve_field(d, retrieve_field(d, k, "type:"), "ptd:")
+    if  'prms:' in d[ptd_id]:
+        tree_list_id = retrieve_field(d, ptd_id, "prms:")
+        prms = []
+        while "chan:" in d[tree_list_id]:
+            prms.append({
+                    "type": resolve_path(d, tree_list_id, ["valu:"]),
+                    "type_name": resolve_path(d, tree_list_id, ["valu:", "name:", "name:", "strg:"])
+                })
+            tree_list_id = retrieve_field(d, tree_list_id, "chan:")
+        return prms
+    else:
+        return []
+
+def get_pointer_type_entry(d, k):
+    ptd = resolve_path(d, k, ["type:", "ptd:"])
+    if ptd == 'function_type':
+        info = {
+            "return_expr": {
+                "type": resolve_path(d, k, ["type:", "ptd:", "retn:"]),
+                "type_name": resolve_path(d, k, ["type:", "ptd:", "retn:", "name:", "name:", "strg:"])
+                },
+            "args": collect_fptr_prms(d, k)
+            }
+        res = {
+                    "name": resolve_path(d, k, ["name:", "strg:"]),
+                    "type": "fptr_type",
+                    "info": info
+            }
+        return res
+    else:
+        return {
+                    "name": resolve_path(d, k, ["name:", "strg:"]),
+                    "type": d[retrieve_field(d, k, "type:")][0],
+                    "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
+                }
+
+def get_arg(d, k):
+    argType = d[retrieve_field(d, k, "type:")][0]
+    if argType == 'integer_type':
+        return get_simple_type_entry(d, k)
+    elif argType == "pointer_type":
+        return get_pointer_type_entry(d, k)
+
+
 def simplify_dict(d):
     new_dict = {}
     try:
@@ -77,11 +138,12 @@ def simplify_dict(d):
     new_dict["args"] = []
     for k in get_type_ids(d, "parm_decl"):
         try:
-            new_dict["args"].append({
-                "name": resolve_path(d, k, ["name:", "strg:"]),
-                "type": d[retrieve_field(d, k, "type:")][0],
-                "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
-                })
+            # new_dict["args"].append({
+            #     "name": resolve_path(d, k, ["name:", "strg:"]),
+            #     "type": d[retrieve_field(d, k, "type:")][0],
+            #     "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
+            #     })
+            new_dict["args"].append(get_arg(d, k))
         except:
             pass
     return new_dict

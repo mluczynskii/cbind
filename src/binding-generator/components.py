@@ -115,7 +115,7 @@ class Struct(Component):
     def __str__(self):
         prefix = f'struct {self.name}'
         content = '\n'.join(map(str, self.fields))
-        return prefix + '{\n' + content + '\n}'
+        return prefix + '{\n' + content + '\n};'
 
 @dataclass 
 class Context(Struct):

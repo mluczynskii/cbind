@@ -41,7 +41,7 @@ class LuaRegister(Component):
 
     def __str__(self):
         declaration = f'const struct luaL_Reg {self.name}[]'
-        xs = ['{' + f'{f_name}, c_{f_name}' + '}' for f_name in self.f_names]
+        xs = ['{' + f'"{f_name}", c_{f_name}' + '}' for f_name in self.f_names]
         return declaration + ' = {\n' + ',\n'.join(xs) + '\n};'
 
 @dataclass

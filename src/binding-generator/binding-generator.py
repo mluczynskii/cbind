@@ -12,9 +12,8 @@ HEADERS = [
 usedWrapperNames = {}
 
 def loadInfo(filename):
-    f = open(filename, 'r')
-    data = json.load(f)
-    f.close()
+    with open(filename, 'r') as input:
+        data = json.load(input)
     return data
 
 def writeHeaders(file):
@@ -51,13 +50,12 @@ def writeDeclarations(file, data):
     file.write('\n');
 
 def writeContext(file):
-    context = Context(
+    definition = Struct(
         'context',
-        [Variable('lua_State*', 'stack'),
-         Variable('int', 'idx')]
+        [Variable('lua_State*', 'stack'), Variable('int', 'idx')]
     )
     declaration = Variable('struct context', 'c')
-    file.write(f'{context}\n{declaration}\n\n')
+    file.write(f'{definition}\n{declaration}\n\n')
 
 # Generates a name for a callback wrapper based on it's type
 def callbackWrapperName(info):
@@ -68,16 +66,18 @@ def callbackWrapperName(info):
 # Generates a wrapper that allows to callback to lua functions
 def callbackWrapper(info, name):
     args = [f'{arg["type_name"]} arg{i+1}' for i, arg in enumerate(info["args"])]
-    prefix = Block([
-        FunctionCall('lua_pushvalue', ['c.stack', 'c.idx'], semicolon=True)
-    ])
+
+    content = Sequence()
+    content = content + FunctionCall('lua_pushvalue', ['c.stack', 'c.idx'], semicolon=True)
+
     for i in range(len(args)):
-        push = FunctionCall(
+        pushArg = FunctionCall(
             'lua_pushinteger', 
             ['c.stack', f'arg{i+1}'], 
             semicolon=True
         )
-        prefix = prefix + push
+        content = content + pushArg
+
     pcall = FunctionCall(
         'lua_pcall', 
         ['c.stack', len(args), 1, 0], 
@@ -87,15 +87,14 @@ def callbackWrapper(info, name):
         'lua_tonumber', 
         ['c.stack', -1]
     )
-    content = prefix + pcall + Return(pop)
-    return Function(info["return_expr"]["type_name"], name, args, content=content)
+    content = content + pcall + Return(pop)
+    return Function(info["return_expr"]["type_name"], name, args, seq=content)
 
 # Writes wrappers for API functions and required callback types to file
 def writeWrappers(file, data):
     for function in data:
-        argcount = len(function["args"])
-
-        setup, apiargs = [], []
+        content = Sequence()
+        arglist = []
         for i, arg in enumerate(function["args"]):
             if arg["type"] == 'fptr_type':
                 name = callbackWrapperName(arg["info"])
@@ -103,33 +102,29 @@ def writeWrappers(file, data):
                     usedWrapperNames[name] = True
                     wrapper = callbackWrapper(arg["info"], name);
                     file.write(f'{wrapper}\n\n')
-                apiargs.append(f'&{name}')
-                setup.append(ContextChange(i+1));
+                arglist.append(f'&{name}')
+                content = content + ContextChange(i+1);
             else:
                 x = Variable(
                     "int",
                     f'arg{i+1}',
                     value=FunctionCall('lua_tonumber', ['L', i+1])
                 )
-                apiargs.append(f'arg{i+1}')
-                setup.append(x)
-        prefix = Block(setup)
+                arglist.append(f'arg{i+1}')
+                content = content + x
 
         apicall = FunctionCall(
             function["name"],
-            apiargs
+            arglist
         )
 
-        suffix = Block([
-            FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True),
-            Return(1)
-        ]) 
+        content = content + FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True) + Return(1)
 
         wrapper = Function(
             'int', 
             f'c_{function["name"]}', 
             ['lua_State* L'],
-            content=prefix + suffix
+            seq=content
         )
 
         file.write(f'{wrapper}\n\n')

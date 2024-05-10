@@ -19,7 +19,6 @@ def skip_empty(f):
         f.readline()
 
 def eof(f, size):
-    #print(f.tell(), size)
     return f.tell() == size
 
 def get_file_size(file):
@@ -37,15 +36,20 @@ def parse_dict(d):
                 vals[i] = d[vals[i]][0]
     return d
 
+#returns field value of given node
 def retrieve_field(d, node_id, field):
-    if field == "ptd:" or field == "ptd :":
-        return d[node_id][d[node_id].index("ptd") + 2]
+    if field == "ptd:" or field == "ptd :" \
+    or field == "tag:" or field == "tag :":
+        field  = field[0:field.index(":")].strip()
+        return d[node_id][d[node_id].index(field) + 2]
     else:
         return d[node_id][d[node_id].index(field) + 1]
 
+#returns first col of node
 def retrieve_node(d, node_id):
     return d[node_id][0]
 
+#resolves fileds given in path and returns first col of node if last field value is node_id
 def resolve_path(d, start, path):
     temp = start
     for field in path:
@@ -73,7 +77,7 @@ def collect_fptr_prms(d, k):
     #are given on list of tree_list nodes, terminated by void_type
     #else no parameters are present
     #(d,k) -> type -> ptd -? 'prms' while tree_list has @chan
-    #neds to be checked
+    #needs to be checked
     ptd_id = retrieve_field(d, retrieve_field(d, k, "type:"), "ptd:")
     if  'prms:' in d[ptd_id]:
         tree_list_id = retrieve_field(d, ptd_id, "prms:")
@@ -99,9 +103,9 @@ def get_pointer_type_entry(d, k):
             "args": collect_fptr_prms(d, k)
             }
         res = {
-                    "name": resolve_path(d, k, ["name:", "strg:"]),
-                    "type": "fptr_type",
-                    "info": info
+                "name": resolve_path(d, k, ["name:", "strg:"]),
+                "type": "fptr_type",
+                "info": info
             }
         return res
     else:
@@ -111,12 +115,37 @@ def get_pointer_type_entry(d, k):
                     "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
                 }
 
+
+def get_struct_fields(d, k):
+    #przelecieć po słowniku i zebrać (przy użyciu get_arg?) te field_decl których scpe == k
+    record = retrieve_field(d, k, "type:")
+    res = []
+    for key in d.keys():
+        if retrieve_node(d, key) == "field_decl":
+            if retrieve_field(d, key, "scpe:") == record:
+                res.append(get_arg(d, key))
+    return res
+
+
+def get_struct_type_entry(d, k):
+    res = {
+        "name": resolve_path(d, k, ["name:", "strg:"]),
+        "type": resolve_path(d, k, ["type:", "tag :"]),
+        "type_name": resolve_path(d, k, ["type:", "name:", "strg:"]),
+        "fields": get_struct_fields(d, k)
+    }
+
+    return res
+
+
 def get_arg(d, k):
     argType = d[retrieve_field(d, k, "type:")][0]
-    if argType == 'integer_type':
+    if argType == "integer_type":
         return get_simple_type_entry(d, k)
     elif argType == "pointer_type":
         return get_pointer_type_entry(d, k)
+    elif argType == "record_type":
+        return get_struct_type_entry(d, k)
 
 
 def simplify_dict(d):
@@ -138,14 +167,9 @@ def simplify_dict(d):
     new_dict["args"] = []
     for k in get_type_ids(d, "parm_decl"):
         try:
-            # new_dict["args"].append({
-            #     "name": resolve_path(d, k, ["name:", "strg:"]),
-            #     "type": d[retrieve_field(d, k, "type:")][0],
-            #     "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
-            #     })
             new_dict["args"].append(get_arg(d, k))
         except:
-            pass
+            print("Could not append arg.")
     return new_dict
 
 def validate_file(file):

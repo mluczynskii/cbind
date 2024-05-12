@@ -167,7 +167,7 @@ def simplify_dict(d):
     for k in get_type_ids(d, "parm_decl"):
         try:
             # Checking if param k is in function signature
-            if resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
+            if "scpe:" in d[k] and resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
                 new_dict["args"].append(get_arg(d, k))
         except ValueError as err:
             print(f'Could not append arg {k} of {d["@0"][0]}.')

@@ -125,6 +125,7 @@ def run_auto_test(case):
         else:
             print("Error: Lua test script execution failed:")
             print(result.stdout)
+            print(result.stderr)
 
 def run_case(case, test_type):
     copy_src_code(case)

@@ -59,12 +59,12 @@ def compile_with_binding(case):
     result2 = subprocess.run(["python3", GENERATOR_PATH, "data.json", f"./{BINDING_FILE_NAME}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     if result2.returncode != 0:
-        return compile_with_binding_error(result1, "Code Generating error:")
+        return compile_with_binding_error(result2, "Code Generating error:")
     
     result3 = subprocess.run(["make"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     if result3.returncode != 0:
-        return compile_with_binding_error(result1, "Make error:")
+        return compile_with_binding_error(result3, "Make error:")
     
     return 0
 

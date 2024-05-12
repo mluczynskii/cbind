@@ -1,5 +1,6 @@
 import re
 import os
+import sys
 
 def get_name(l):
     return l[l.find(" ", 11) + 1:l.find(" ", 12)]
@@ -170,10 +171,9 @@ def simplify_dict(d):
             if "scpe:" in d[k] and resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
                 new_dict["args"].append(get_arg(d, k))
         except ValueError as err:
-            print(f'Could not append arg {k} of {d["@0"][0]}.')
-            print(err)
+            print(f'Could not append arg {k} of {d["@0"][0]}.\n{err}', file=sys.stderr)
         except Exception as exc:
-            print(exc) 
+            print(exc, file=sys.stderr) 
         # new_dict["args"].append(get_arg(d, k))
     return new_dict
 

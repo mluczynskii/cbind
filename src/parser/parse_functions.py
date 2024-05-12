@@ -112,7 +112,7 @@ def get_pointer_type_entry(d, k):
         return {
                     "name": resolve_path(d, k, ["name:", "strg:"]),
                     "type": d[retrieve_field(d, k, "type:")][0],
-                    "type_name": resolve_path(d, k, ["type:", "name:", "name:", "strg:"])
+                    "type_name": resolve_path(d, k, ["type:", "ptd:", "name:", "name:", "strg:"]) + "ptr_type"
                 }
 
 
@@ -167,9 +167,15 @@ def simplify_dict(d):
     new_dict["args"] = []
     for k in get_type_ids(d, "parm_decl"):
         try:
-            new_dict["args"].append(get_arg(d, k))
-        except:
-            print("Could not append arg.")
+            # Checking if param k is in function signature
+            if resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
+                new_dict["args"].append(get_arg(d, k))
+        except ValueError as err:
+            print(f"Could not append arg {k} of {d["@0"][0]}.")
+            print(err)
+        except Exception as exc:
+            print(exc) 
+        # new_dict["args"].append(get_arg(d, k))
     return new_dict
 
 def validate_file(file):

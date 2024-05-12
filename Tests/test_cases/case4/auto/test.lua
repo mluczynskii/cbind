@@ -8,6 +8,7 @@ function test_numerator()
             xs = {i, j}
             if CFunction.numerator(xs) ~= numerator(xs) then
                 print("Test failed for numerator function, input: i = " .. i .. ", j = " .. j)
+                print("Result: " .. CFunction.numerator(xs) .. ", expected: " .. numerator(xs))
                 return false
             end
         end
@@ -31,24 +32,7 @@ function test_multiply()
     return true
 end
 
-function test_string_compare()
-    i = "abc"
-    j = "bca"
-    if CFunction.string_compare({i}, {j}) == 0 then
-        print("Test failed for string_compare function, input: i = " .. i .. ", j = " .. j)
-        return false
-    end
-    i = "abc"
-    j = "abc"
-    if CFunction.string_compare({i}, {j}) ~= 0 then
-        print("Test failed for string_compare function, input: i = " .. i .. ", j = " .. j)
-        return false
-    end
-    return true
-end
-
-
-if test_numerator() and test_multiply() and test_string_compare() then
+if test_numerator() and test_multiply() then
     io.stderr:write("true\n")
 else
     io.stderr:write("false\n")

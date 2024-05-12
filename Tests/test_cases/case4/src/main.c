@@ -1,27 +1,20 @@
 #include "lua_binding_api.h"
 #include <string.h>
 
-typedef struct {
+struct Fraction{
     int x, y;
-} Fraction;
+};
 
-int numerator(Fraction a){
+int numerator(struct Fraction a){
     return a.x;
 }
 
-typedef struct {
-    char* val;
-} String;
-
-int string_compare(String a, String b){
-    return strcmp(a.val, b.val);
-}
-
-typedef struct {
+struct Int{
     int val;
-} Int;
+};
 
-int multiply(Int a, int b){
+int multiply(struct Int a, int b){
+    void *args[2] = {&a, &b};
     return a.val * b;
 }
 

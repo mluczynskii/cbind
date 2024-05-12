@@ -117,7 +117,6 @@ def get_pointer_type_entry(d, k):
 
 
 def get_struct_fields(d, k):
-    #przelecieć po słowniku i zebrać (przy użyciu get_arg?) te field_decl których scpe == k
     record = retrieve_field(d, k, "type:")
     res = []
     for key in d.keys():
@@ -171,7 +170,7 @@ def simplify_dict(d):
             if resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
                 new_dict["args"].append(get_arg(d, k))
         except ValueError as err:
-            print(f"Could not append arg {k} of {d["@0"][0]}.")
+            print(f'Could not append arg {k} of {d["@0"][0]}.')
             print(err)
         except Exception as exc:
             print(exc) 

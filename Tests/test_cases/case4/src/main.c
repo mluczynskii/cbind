@@ -6,6 +6,7 @@ struct Fraction{
 };
 
 int numerator(struct Fraction a){
+    void *args[2] = {&a.x, &a.y};
     return a.x;
 }
 

@@ -56,6 +56,8 @@ def writeDeclarations(file, data):
                     [x["type_name"] for x in info["args"]]
                 )
                 arglist.append(str(fptr))
+            elif arg['type'] == 'struct':
+                arglist.append(f'struct {arg["type_name"]} arg{i+1}')
             else:
                 arglist.append(f'{arg["type_name"]} arg{i+1}')
 

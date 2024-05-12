@@ -122,3 +122,14 @@ class Struct(Component):
         declaration = f'struct {self.name}'
         content = '\n'.join(map(str, self.fields))
         return declaration + '{\n' + content + '\n};'
+    
+@dataclass 
+class InitStruct(Component):
+    struct: str
+    name: str 
+    values: list[str]
+
+    def __str__(self) -> str:
+        values = ','.join(self.values)
+        return f'struct {self.struct} {self.name} = {{ {values} }};'
+

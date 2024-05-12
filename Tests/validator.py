@@ -16,6 +16,7 @@ BINDING_FILE_NAME = "binding.c"
 TESTING_FILE = "main"
 
 VERBOSE = False
+KEEP_FILES = False
 
 # Copy C program source code from /test_cases/casei/src to the working directory
 def copy_src_code(case):
@@ -156,16 +157,19 @@ def run_cases(selectedCases, test_type):
     for case in selectedCases:
         print(f"Running : {case}")
         run_case(case, test_type)
-        cleanup_test_environment()
+        if not KEEP_FILES:
+            cleanup_test_environment()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Run test cases.")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show detailed information about failed tests.")
     parser.add_argument("-cases", "--selected_cases", nargs="+", help="Run specific test cases (space-separated list).")
     parser.add_argument("-t", "--test_type", choices=["auto", "manual"], default="auto", help="Test type: auto (unit tests) or manual (manual tests). Default: auto.")
+    parser.add_argument("-k", "--keep_files", action="store_true", help="Keep temporary files after validation")
     args = parser.parse_args()
 
     VERBOSE = args.verbose
+    KEEP_FILES = args.keep_files
 
     if args.selected_cases:
         selected_cases = [f"case{case}" for case in args.selected_cases]

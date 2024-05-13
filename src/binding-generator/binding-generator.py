@@ -2,6 +2,7 @@ from lib.components import *
 from lua_components import *
 from lib.structs import StructHandler 
 from lib.callbacks import CallbackHandler
+from lib.functions import FunctionHandler
 
 import json
 import argparse 
@@ -24,6 +25,7 @@ def writeHeaders(file):
     file.write('\n')
 
 def writeBoilerplate(file):
+    file.write('// boilerplate code\n')
     file.write(boilerplate.code + '\n')
 
 # writes wrapper into .lua binding file that is used to call API
@@ -40,40 +42,6 @@ def writeLuaWrapper(luafile, module, fname, arglist, ptrname):
     )
     luafile.write(f'{wrapper}\n')
 
-# write extern declarations of the targeted C API
-def writeDeclarations(file, data):
-    structDeclarations = structHandler.declareStructs()
-    file.write(f'{structDeclarations}\n')
-
-    for function in data:
-        arglist = []
-        for i, arg in enumerate(function["args"]):
-            if arg["type"] == 'fptr_type':
-                info = arg["info"]
-                fptr = FunctionPointer(
-                    info["return_expr"]["type_name"],
-                    f'arg{i+1}',
-                    [x["type_name"] for x in info["args"]]
-                )
-                arglist.append(str(fptr))
-            elif arg['type'] == 'struct':
-                arglist.append(f'struct {arg["type_name"]} arg{i+1}')
-            else:
-                arglist.append(f'{arg["type_name"]} arg{i+1}')
-
-        declaration = Function(
-            function["return_expr"]["type_name"],
-            function["name"],
-            arglist, 
-            modifier=Modifier.EXTERN
-        )
-
-        file.write(f'{declaration}\n');
-    file.write('\n');
-
-    callbackCallers = callbackHandler.defineCallbacks()
-    file.write(f'{callbackCallers}\n')
-
 def writeContext(file):
     definition = Struct(
         'context',
@@ -82,74 +50,53 @@ def writeContext(file):
     declaration = Variable('struct context', 'c')
     file.write(f'{definition}\n{declaration}\n\n')
 
-# writes wrappers for API functions and required callback types to file
-def writeWrappers(file, data):
-    for function in data:
-        content = Sequence()
-        arglist = []
-        for i, arg in enumerate(function["args"]):
-            if arg["type"] == 'fptr_type':
-                name = CallbackHandler.callbackWrapperName(arg["info"])
-                arglist.append(f'&{name}')
-                content = content + ContextChange(i+1);
-            elif arg['type'] == 'struct':
-                structName = arg['type_name']
-                unpack = structHandler.unpackStruct(structName, i+1)
-                arglist.append(f'arg{i+1}')
-                content = content + unpack
-            else:
-                x = Variable(
-                    "int",
-                    f'arg{i+1}',
-                    value=FunctionCall('lua_tonumber', ['L', i+1])
-                )
-                arglist.append(f'arg{i+1}')
-                content = content + x
-
-        apicall = FunctionCall(
-            function["name"],
-            arglist
-        )
-
-        content = content + FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True) + Return(1)
-
-        wrapper = Function(
-            'int', 
-            f'c_{function["name"]}', 
-            ['lua_State* L'],
-            seq=content
-        )
-
-        file.write(f'{wrapper}\n\n')
-
-def writeRegister(file, data):
-    xs = [f["name"] for f in data]
-    register = LuaRegister("luareg", xs)
+def writeRegister(file):
+    register = functionHandler.defineRegister()
     file.write(f'{register}\n\n')
+
+# write extern declarations of the targeted C API, along with needed type declarations
+def writeDeclarations(file):
+    file.write(f'// struct declarations\n')
+    structDeclarations = structHandler.declareStructs()
+    file.write(f'{structDeclarations}\n\n')
+
+    file.write(f'// function declarations\n')
+    functionDeclarations = functionHandler.declareFunctions()
+    file.write(f'{functionDeclarations}\n\n')
+
+# write wrappers for needed callbacks and API functions
+def writeWrappers(file):
+    file.write(f'// callback wrappers\n')
+    callbackCallers = callbackHandler.defineCallbacks()
+    file.write(f'{callbackCallers}\n\n')
+
+    file.write(f'// function wrappers\n')
+    functionWrappers = functionHandler.defineWrappers()
+    file.write(f'{functionWrappers}\n\n')
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="binding-generator",
-        description="Generates binding file based on C API AST dump."
+        prog='binding-generator',
+        description='Generates binding file based on C API AST dump.'
     )
-    parser.add_argument("inputfile")
-    parser.add_argument("outputfile")
+    parser.add_argument('inputfile')
+    parser.add_argument('outputfile')
     args = parser.parse_args()
 
     data = loadInfo(args.inputfile)
 
-    global structHandler, callbackHandler
+    global structHandler, callbackHandler, functionHandler
     structHandler = StructHandler(data)
     callbackHandler = CallbackHandler(data)
+    functionHandler = FunctionHandler(data, structHandler)
 
     with open(args.outputfile, 'w') as output:
-        output.write("// Generated by binding-generator.py \n")
+        output.write('// Generated by binding-generator.py \n')
         writeHeaders(output)
         writeContext(output)
-        writeDeclarations(output, data)
-        writeWrappers(output, data)
-        writeRegister(output, data)
-        output.write("// Boilerplate code \n")
+        writeDeclarations(output)
+        writeWrappers(output)
+        writeRegister(output)
         writeBoilerplate(output)
 
 if __name__ == '__main__':

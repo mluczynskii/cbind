@@ -1,14 +1,14 @@
 require "binding"
 
-function increment(x) do
+function increment(x)
     return x+1
 end
 
-function decrement(x) do
+function decrement(x)
     return x+1
 end
 
-function test_counter() do
+function test_counter()
     x = 0
     cnt = {}
     cnt["val"] = 0

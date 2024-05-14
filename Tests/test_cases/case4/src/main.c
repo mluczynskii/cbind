@@ -1,3 +1,5 @@
+// Test with simple structures
+
 #include <stdio.h>
 #include "lua_binding_api.h"
 

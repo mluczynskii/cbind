@@ -109,6 +109,13 @@ def get_pointer_type_entry(d, k):
                 "info": info
             }
         return res
+    elif ptd == 'record_type':
+        return {
+                    "name": resolve_path(d, k, ["name:", "strg:"]),
+                    "type": "structptr_type",
+                    "type_name": resolve_path(d, k, ["type:", "ptd :", "name:", "strg:"]),
+                    "fields": get_record_fields(d, retrieve_field(d, retrieve_field(d, k, "type:"), "ptd :"))
+                }
     else:
         return {
                     "name": resolve_path(d, k, ["name:", "strg:"]),
@@ -116,16 +123,25 @@ def get_pointer_type_entry(d, k):
                     "type_name": resolve_path(d, k, ["type:", "ptd:", "name:", "name:", "strg:"]) + "ptr_type"
                 }
 
-
-def get_struct_fields(d, k):
-    record = retrieve_field(d, k, "type:")
+def get_record_fields(d, k):
     res = []
     for key in d.keys():
         if retrieve_node(d, key) == "field_decl":
-            if retrieve_field(d, key, "scpe:") == record:
+            if retrieve_field(d, key, "scpe:") == k:
                 res.append(get_arg(d, key))
     return res
 
+def get_struct_fields(d, k):
+    record = retrieve_field(d, k, "type:")
+    return get_record_fields(d, record)
+
+def get_record_type_entry(d, k):
+    res = {
+        "name": resolve_path(d, k, ["name:", "strg:"]),
+        "type": resolve_path(d, k, ["tag :"]),
+        "fields": get_record_fields(d, k)
+    }
+    return res
 
 def get_struct_type_entry(d, k):
     res = {
@@ -134,7 +150,6 @@ def get_struct_type_entry(d, k):
         "type_name": resolve_path(d, k, ["type:", "name:", "strg:"]),
         "fields": get_struct_fields(d, k)
     }
-
     return res
 
 

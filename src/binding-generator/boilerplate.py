@@ -4,7 +4,7 @@ lua_State* L;
 int execScript(const char* filename) {
 if (!L) return 1;
 int status = luaL_dofile(L, filename);
-return status;
+return lua_tostring(L, -1);
 }
 
 void initLua(const char* modulename) {

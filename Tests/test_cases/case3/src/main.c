@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "lua_binding_api.h"
 
 int apply(int a,  int (*f)(int)){
@@ -23,7 +24,7 @@ int main(int argc, char** argv) {
     char *file_name = argv[1];
 
     initLua("CFunction");
-    execScript(file_name);
+    printf("%s", execScript(file_name));
     closeLua();
 
     return 0;

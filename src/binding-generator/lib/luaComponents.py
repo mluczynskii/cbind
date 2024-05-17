@@ -42,13 +42,15 @@ class LuaCopyStruct(LuaComponent):
 @dataclass 
 class LuaCallApi(LuaComponent):
     modulename: str 
-    f_name: str 
+    functionName: str 
     arglist: list[str]
+    referenceIndex: list[int]
 
     def __str__(self) -> str:
         arglist = ', '.join(self.arglist)
         call = f'{self.modulename}.{self.f_name}({arglist})'
-        return f'value, nstruct = {call}'
+        newStructs = ', '.join([f'narg{i}' for i in referenceIndex])
+        return f'value, {newStructs} = {call}'
     
 @dataclass 
 class LuaReturn(LuaComponent):

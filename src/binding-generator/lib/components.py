@@ -42,11 +42,13 @@ class Include(Component):
 @dataclass
 class LuaRegister(Component):
     name: str 
-    functions: list[str]
+    functions: dict
 
     def __str__(self) -> str:
         declaration = f'const struct luaL_Reg {self.name}[]'
-        xs = [f'{{ "{f}", c_{f} }}' for f in self.functions]
+        xs = []
+        for apiName, wrapperName in self.functions:
+            xs.append(f'{{ "{apiName}", {wrapperName} }}')
         return declaration + ' = {\n' + ',\n'.join(xs) + '\n};'
 
 @dataclass

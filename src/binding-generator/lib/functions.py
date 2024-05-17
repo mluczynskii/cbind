@@ -11,9 +11,13 @@ class FunctionHandler():
             if function['return_expr']['type'] != 'integer_type':
                 continue
             externArgList, apiCallArgList = [], []
-            wrapperCode = Sequence()
+            wrapperCode, afterCallCode = Sequence(), Sequence()
+            returnCount = 1
+            referenceIndex = []
+            argCount = len(function['args'])
             for i, arg in enumerate(function['args']):
-                if arg['type'] == 'fptr_type':
+                type_ = arg['type']
+                if type_ == 'fptr_type':
                     info = arg['info']
                     fptr = FunctionPointer(
                         info['return_expr']['type_name'],
@@ -25,14 +29,26 @@ class FunctionHandler():
                     callbackWrapperName = CallbackHandler.callbackWrapperName(arg['info'])
                     apiCallArgList.append(f'&{callbackWrapperName}')
                     wrapperCode = wrapperCode + ContextChange(i+1)
-                elif arg['type'] == 'struct':
+                elif type_ == 'struct':
                     structName = arg['type_name']
                     externArgList.append(f'struct {structName} {arg["name"]}')
 
                     unpack = structHandler.unpackStruct(structName, i+1)
                     apiCallArgList.append(f'arg{i+1}')
                     wrapperCode = wrapperCode + unpack 
-                elif arg['type'] == 'integer_type':
+                elif type_ == 'structptr_type':
+                    referenceIndex.append(i)
+                    structName = arg['type_name']
+                    externArgList.append(f'struct {structName}* {arg["name"]}')
+
+                    unpack = structHandler.unpackStruct(structName, i+1)
+                    apiCallArgList.append(f'&arg{i+1}')
+                    wrapperCode = wrapperCode + unpack
+
+                    pack = structHandler.packStruct(structName, i+1)
+                    afterCallCode = afterCallCode + pack 
+                    returnCount = returnCount + 1
+                elif type_ == 'integer_type':
                     externArgList.append(f'{arg["type_name"]} {arg["name"]}')
 
                     x = Variable(
@@ -55,14 +71,22 @@ class FunctionHandler():
                     function['name'],
                     apiCallArgList
                 )
-                wrapperCode = wrapperCode + FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True) + Return(1)
+                wrapperCode = wrapperCode + FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True) + afterCallCode + Return(returnCount)
+
+                wrapperName = f'c_{function["name"]}'
+                if len(referenceIndex) > 0:
+                    wrapperName = wrapperName + '_ptr'
+
                 wrapper = Function(
                     'int', 
-                    f'c_{function["name"]}', 
+                    wrapperName, 
                     ['lua_State* L'],
                     seq=wrapperCode 
                 )
                 self.functionInfo[function['name']] = {
+                    'wrapperName': wrapperName 
+                    'argCount': argCount
+                    'references': referenceIndex
                     'declaration': declaration,
                     'wrapper': wrapper  
                 }
@@ -80,5 +104,7 @@ class FunctionHandler():
         return seq 
 
     def defineRegister(self) -> LuaRegister:
-        xs = [name for name in self.functionInfo]
-        return LuaRegister('luareg', xs) 
+        functions = {}
+        for apiName, info in self.functionInfo.items():
+            functions[apiName] = info['wrapperName'] 
+        return LuaRegister('luareg', functions) 

@@ -8,7 +8,8 @@ class FunctionHandler():
     def __init__(self, data: dict, structHandler: StructHandler) -> None:
         self.functionInfo = {}
         for function in data:
-            if function['return_expr']['type'] != 'integer_type':
+            returnType = function['return_expr']['type']
+            if returnType == 'unknown':
                 continue
             externArgList, apiCallArgList = [], []
             wrapperCode, afterCallCode = Sequence(), Sequence()
@@ -37,7 +38,7 @@ class FunctionHandler():
                     apiCallArgList.append(f'arg{i+1}')
                     wrapperCode = wrapperCode + unpack 
                 elif type_ == 'structptr_type':
-                    referenceIndex.append(i)
+                    referenceIndex.append(i+1)
                     structName = arg['type_name']
                     externArgList.append(f'struct {structName}* {arg["name"]}')
 
@@ -61,20 +62,38 @@ class FunctionHandler():
                 else:
                     break 
             else:
-                declaration = Function(
-                    function['return_expr']['type_name'],
-                    function['name'],
-                    externArgList, 
-                    modifier=Modifier.EXTERN
-                )
                 apicall = FunctionCall(
                     function['name'],
                     apiCallArgList
                 )
-                wrapperCode = wrapperCode + FunctionCall('lua_pushinteger', ['L', apicall], semicolon=True) + afterCallCode + Return(returnCount)
+
+                if returnType == None:
+                    returnCount = returnCount - 1
+                    returnTypeName = 'void'
+                    apicall.semicolon = True 
+                    wrapperCode = wrapperCode + apicall
+                else:
+                    returnTypeName = function['return_expr']['type_name']
+                    result = Variable(
+                        returnTypeName,
+                        'result',
+                        value=apicall 
+                    )
+                    wrapperCode = wrapperCode + result + FunctionCall('lua_pushinteger', ['L', 'result'], semicolon=True) 
+                
+                declaration = Function(
+                    returnTypeName,
+                    function['name'],
+                    externArgList, 
+                    modifier=Modifier.EXTERN
+                )
+
+                wrapperCode = wrapperCode + afterCallCode + Return(returnCount)
 
                 wrapperName = f'c_{function["name"]}'
+                intermediateApiName = function['name']
                 if len(referenceIndex) > 0:
+                    intermediateApiName = f'{function["name"]}_ptr'
                     wrapperName = wrapperName + '_ptr'
 
                 wrapper = Function(
@@ -84,11 +103,13 @@ class FunctionHandler():
                     seq=wrapperCode 
                 )
                 self.functionInfo[function['name']] = {
-                    'wrapperName': wrapperName 
-                    'argCount': argCount
-                    'references': referenceIndex
+                    'intermediateName': intermediateApiName,
+                    'wrapperName': wrapperName, 
+                    'argCount': argCount,
+                    'references': referenceIndex,
                     'declaration': declaration,
-                    'wrapper': wrapper  
+                    'wrapper': wrapper,
+                    'void': returnTypeName == 'void'
                 }
 
     def declareFunctions(self) -> Sequence:
@@ -106,5 +127,5 @@ class FunctionHandler():
     def defineRegister(self) -> LuaRegister:
         functions = {}
         for apiName, info in self.functionInfo.items():
-            functions[apiName] = info['wrapperName'] 
+            functions[info['intermediateName']] = info['wrapperName'] 
         return LuaRegister('luareg', functions) 

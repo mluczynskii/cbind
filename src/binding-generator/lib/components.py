@@ -47,7 +47,7 @@ class LuaRegister(Component):
     def __str__(self) -> str:
         declaration = f'const struct luaL_Reg {self.name}[]'
         xs = []
-        for apiName, wrapperName in self.functions:
+        for apiName, wrapperName in self.functions.items():
             xs.append(f'{{ "{apiName}", {wrapperName} }}')
         return declaration + ' = {\n' + ',\n'.join(xs) + '\n};'
 

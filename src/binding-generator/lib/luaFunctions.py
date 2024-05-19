@@ -7,28 +7,32 @@ class LuaFunctionHandler():
     def __init__(self, functionHandler: FunctionHandler) -> None:
         self.functionInfo = {}
         for apiName, info in functionHandler.functionInfo.items():
-            wrapperName = info['wrapperName'] 
-            argCount = info['argCount'] 
             referenceIndex = info['references'] 
+            if len(referenceIndex) == 0:
+                continue
+            argCount = info['argCount'] 
+            intermediateApiName = info['intermediateName']
             arglist = [f'arg{i+1}' for i in range(argCount)]
 
             wrapperCode = LuaSequence()
 
             apiCall = LuaCallApi(
                 'CFunction', 
-                wrapperName,
+                intermediateApiName,
                 arglist,
-                referenceIndex
+                referenceIndex,
+                info['void']
             )
             wrapperCode = wrapperCode + apiCall 
 
-            for idx in refenceIndex:
+            for idx in referenceIndex:
                 copy = LuaCopyStruct(f'narg{idx}', f'arg{idx}')
                 wrapperCode = wrapperCode + copy 
 
-            wrapperCode = wrapperCode + LuaReturn('value')
+            if not info['void']:
+                wrapperCode = wrapperCode + LuaReturn('value')
             wrapper = LuaFunction(
-                'CFunction',
+                f'CFunction.{apiName}',
                 arglist,
                 wrapperCode 
             )

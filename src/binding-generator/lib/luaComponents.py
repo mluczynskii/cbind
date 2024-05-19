@@ -45,12 +45,14 @@ class LuaCallApi(LuaComponent):
     functionName: str 
     arglist: list[str]
     referenceIndex: list[int]
+    void: bool
 
     def __str__(self) -> str:
         arglist = ', '.join(self.arglist)
-        call = f'{self.modulename}.{self.f_name}({arglist})'
-        newStructs = ', '.join([f'narg{i}' for i in referenceIndex])
-        return f'value, {newStructs} = {call}'
+        call = f'{self.modulename}.{self.functionName}({arglist})'
+        newStructs = ', '.join([f'narg{i}' for i in self.referenceIndex])
+        prefix = 'local value, ' if not self.void else 'local '
+        return f'{prefix}{newStructs} = {call}'
     
 @dataclass 
 class LuaReturn(LuaComponent):

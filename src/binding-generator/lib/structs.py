@@ -7,13 +7,13 @@ class StructHandler():
         self.structsInfo = {}
         for f in data:
             for arg in f['args']:
-                if arg['type'] != 'struct':
+                if arg['type'] not in ['struct', 'structptr_type'] :
                     continue
                 fields = [Variable(x['type_name'], x['name']) for x in arg['fields']]
                 struct = Struct(arg['type_name'], fields)
                 self.structsInfo[arg['type_name']] = struct  
 
-    def packStruct(self, structName: str, variableName: str) -> Sequence:
+    def packStruct(self, structName: str, stackIdx: int) -> Sequence:
         seq = Sequence()
         seq = seq + FunctionCall("lua_newtable", ["L"], semicolon=True)
         struct = self.structsInfo[structName]
@@ -21,7 +21,7 @@ class StructHandler():
             fieldName = field.name
             pushField = FunctionCall(
                 "lua_pushinteger",
-                ["L", f'{variableName}.{fieldName}'],
+                ["L", f'arg{stackIdx}.{fieldName}'],
                 semicolon=True
             )
             setField = FunctionCall(

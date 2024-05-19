@@ -42,7 +42,8 @@ def writeRegister(file, functionHandler):
 
 # writes wrappers into .lua binding file that is used to call API functions using struct pointers 
 def writeLuaWrappers(luaFile, luaFunctionHandler):
-    luaFile.write(luaFunctionHandler.defineWrappers())
+    wrappers = luaFunctionHandler.defineWrappers()
+    luaFile.write(str(wrappers))
 
 # write extern declarations of the targeted C API, along with needed type declarations
 def writeDeclarations(file, structHandler, functionHandler):
@@ -74,7 +75,7 @@ def main():
     parser.add_argument('luaOutputFile')
     args = parser.parse_args()
 
-    data = loadInfo(args.inputfile)
+    data = loadInfo(args.inputFile)
 
     structHandler = StructHandler(data)
     callbackHandler = CallbackHandler(data)

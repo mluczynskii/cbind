@@ -186,6 +186,11 @@ def simplify_dict(d):
             "type": None,
             "type_name": None
             }
+    try:
+        src = resolve_path(d, get_type_ids(d, "function_decl")[0], ["srcp:"])
+        new_dict["srcp"] = src[0:src.index(":")]
+    except:
+        new_dict["scrp"] = None    
     new_dict["args"] = []
     for k in get_type_ids(d, "parm_decl"):
         try:

@@ -128,7 +128,8 @@ def get_record_fields(d, k):
     for key in d.keys():
         if retrieve_node(d, key) == "field_decl":
             if retrieve_field(d, key, "scpe:") == k:
-                res.append(get_arg(d, key))
+                arg = get_arg(d, key);
+                res.append(arg)
     return res
 
 def get_struct_fields(d, k):
@@ -161,6 +162,12 @@ def get_arg(d, k):
         return get_pointer_type_entry(d, k)
     elif argType == "record_type":
         return get_struct_type_entry(d, k)
+    else:
+        return {
+            "name": "unknown",
+            "type": "unknown",
+            "type_name": "unknown"
+        }
 
 
 def simplify_dict(d):

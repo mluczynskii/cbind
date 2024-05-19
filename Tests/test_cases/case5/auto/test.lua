@@ -1,11 +1,13 @@
-require "binding"
+package.path = package.path .. ";./../../../?.lua"
+
+require("binding")
 
 function increment(x)
     return x+1
 end
 
 function decrement(x)
-    return x+1
+    return x-1
 end
 
 function test_counter()

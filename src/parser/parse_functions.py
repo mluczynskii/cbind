@@ -162,12 +162,12 @@ def get_arg(d, k):
         return get_pointer_type_entry(d, k)
     elif argType == "record_type":
         return get_struct_type_entry(d, k)
-    else:
-        return {
-            "name": "unknown",
-            "type": "unknown",
-            "type_name": "unknown"
-        }
+    # else:
+    #     return {
+    #         "name": "unknown",
+    #         "type": "unknown",
+    #         "type_name": "unknown"
+    #     }
 
 
 def simplify_dict(d):
@@ -202,7 +202,10 @@ def simplify_dict(d):
         except Exception as exc:
             print(exc, file=sys.stderr) 
         # new_dict["args"].append(get_arg(d, k))
-    return new_dict
+    if len(new_dict["args"]) == len(get_type_ids(d, "parm_decl")):
+        return new_dict
+    else:
+        return None
 
 def validate_file(file):
     skip_empty(file)
@@ -226,5 +229,7 @@ def run_parser(file):
             skip_empty(file)
             dict[node[0]] = node[1:]
         # print(simplify_dict(dict))
-        res.append(simplify_dict(dict))
+        dict = simplify_dict(dict)
+        if dict:
+            res.append(dict)
     return res

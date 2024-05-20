@@ -156,7 +156,7 @@ def get_struct_type_entry(d, k):
 
 def get_arg(d, k):
     argType = d[retrieve_field(d, k, "type:")][0]
-    if argType == "integer_type":
+    if argType == "integer_type" or argType == "real_type":
         return get_simple_type_entry(d, k)
     elif argType == "pointer_type":
         return get_pointer_type_entry(d, k)

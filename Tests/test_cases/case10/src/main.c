@@ -2,16 +2,16 @@
 #include <string.h>
 #include "lua_binding_api.h"
 
-const char* identity(const char* a){
-    return a;
+short inc(short x){
+    return x+1;
 }
 
-const char* min_string(const char* a, const char* b){
-    if (strcmp(a, b) < 0) {
-        return a;
-    }else{
-        return b;
-    }
+short square(short x){
+    return x*x;
+}
+
+short int add(short int x, short int y){
+    return x+y;
 }
 
 int main(int argc, char** argv) {

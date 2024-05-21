@@ -18,6 +18,7 @@ function test_identity()
         x = randomString()
         if CFunction.identity(x) ~= x then
             print("Test identity(const char*) failed for input: " .. x)
+            print("Result: " .. CFunction.identity(x))
             return false
         end
     end
@@ -39,6 +40,7 @@ function test_min_string()
         y = randomString()
         if CFunction.min_string(x, y) ~= min_string(x, y) then
             print("Test min_string(const char*, const char*) failed for input: " .. x .. " " .. y)
+            print("Result: " .. CFunction.min_string(x, y))
             return false
         end
     end

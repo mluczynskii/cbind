@@ -31,6 +31,7 @@ function test_min_char()
         y = randomLetter()
         if CFunction.min_char(x, y) ~= min_char(x, y) then
             print("Test min_char(char, char) failed for input: " .. x .. " " .. y)
+            print("Result: " .. CFunction.min_char(x, y))
             return false
         end
     end

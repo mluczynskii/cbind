@@ -11,11 +11,13 @@ function test_apply()
     for i = 0, 100 do
         if CFunction.apply(i, inc) ~= i + 1 then
             print("Test failed for apply function with callback inc(x),  input: " .. i)
+            print("Result: " .. CFunction.apply(i, inc))
             return false
         end
 
         if CFunction.apply(i, square) ~= i * i then
             print("Test failed for apply function with callback square(x), input: " .. i)
+            print("Result: " .. CFunction.apply(i, square))
             return false
         end
     end

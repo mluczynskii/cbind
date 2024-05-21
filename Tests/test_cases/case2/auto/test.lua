@@ -3,6 +3,7 @@ function test()
     for i = 1, 10000 do
         if CFunction.square(i) ~= i*i then
             print("Test failed for square function with input: " .. i)
+            print("Result: " .. CFunction.square(i))
             return false
         end
     end
@@ -12,6 +13,7 @@ function test()
         expected = (x + 10)*(x + 10)
         if CFunction.square(CFunction.return_ten() + x) ~= expected then
             print("Test failed for square function with return_ten, input: " .. x)
+            print("Result: " .. CFunction.square(CFunction.return_ten() + x))
             return false
         end
     end

@@ -3,6 +3,7 @@ function test()
     for i = 1, 10000 do
         if CFunction.inc(i) ~= i + 1 then
             print("Test increment failed for input: " .. i)
+            print("Result: " .. CFunction.inc(i))
             return false
         end
     end
@@ -11,6 +12,7 @@ function test()
         local x = math.random(100000, 10000000)
         if CFunction.inc(x) ~= x + 1 then
             print("Test increment failed for input: " .. x)
+            print("Result: " .. CFunction.inc(x))
             return false
         end
     end

@@ -171,7 +171,7 @@ def get_arg(d, k):
 
 def get_return_expr(d, k):
     returnType = resolve_path(d, k, ["expr:", "type:"])
-    if returnType == "integer_type":
+    if returnType == "integer_type" or returnType == "real_type":
         return {
             "type": resolve_path(d, k, ["expr:", "type:"]),
             "type_name": resolve_path(d, k, ["expr:", "type:", "name:", "name:", "strg:"]),

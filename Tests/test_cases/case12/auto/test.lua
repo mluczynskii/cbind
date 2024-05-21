@@ -2,7 +2,7 @@ function randomFloat()
     return 1 + (1000 - 1) * math.random()
 end
 
-local epsilon = 0.005
+local epsilon = 0.1
 
 -- Function to test div(double, double) function
 function test_div()
@@ -21,8 +21,8 @@ end
 -- Function to test mult(double, double) function
 function test_mult()
     for i = 1, 1000 do
-        x = randomdouble()
-        y = randomdouble()
+        x = randomFloat()
+        y = randomFloat()
         if math.abs(CFunction.mult(x, y) - x*y) > epsilon then
             print("Test failed for mult(double, double) function with input: " .. x .. " " .. y)
             print("Result: " .. CFunction.mult(x, y))

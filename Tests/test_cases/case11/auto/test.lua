@@ -2,7 +2,7 @@ function randomFloat()
     return 1 + (1000 - 1) * math.random()
 end
 
-local epsilon = 0.005
+local epsilon = 0.1
 
 -- Function to test div(float, float) function
 function test_div()

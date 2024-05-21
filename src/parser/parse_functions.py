@@ -66,6 +66,15 @@ def get_type_ids(d, node):
             res.append(k)
     return res
 
+def get_local_ids(d, ids, local):
+    res = []
+    for id in ids:
+        src = retrieve_field(d, x, "srcp:")
+        src = src[0: src.index(":")]
+        if src == local:
+            res.append(id)
+    return res
+
 def get_simple_type_entry(d, k):
     return {
                 "name": resolve_path(d, k, ["name:", "strg:"]),
@@ -202,7 +211,8 @@ def simplify_dict(d):
     except:
         new_dict["scrp"] = None    
     new_dict["args"] = []
-    for k in get_type_ids(d, "parm_decl"):
+    parm_ids = list(filter(lambda x : "scpe:" in d[x], get_type_ids(d, "parm_decl")))
+    for k in parm_ids:
         try:
             # Checking if param k is in function signature
             if "scpe:" in d[k] and resolve_path(d, k, ["scpe:", "name:", "strg:"]) == d["@0"][0]:
@@ -212,7 +222,7 @@ def simplify_dict(d):
         except Exception as exc:
             print(exc, file=sys.stderr) 
         # new_dict["args"].append(get_arg(d, k))
-    if len(new_dict["args"]) == len(get_type_ids(d, "parm_decl")):
+    if len(new_dict["args"]) == len(parm_ids):
         return new_dict
     else:
         return None

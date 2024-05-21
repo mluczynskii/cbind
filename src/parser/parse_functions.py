@@ -120,7 +120,7 @@ def get_pointer_type_entry(d, k):
         return {
                     "name": resolve_path(d, k, ["name:", "strg:"]),
                     "type": d[retrieve_field(d, k, "type:")][0],
-                    "type_name": resolve_path(d, k, ["type:", "ptd:", "name:", "name:", "strg:"]) + "ptr_type"
+                    "type_name": resolve_path(d, k, ["type:", "ptd:", "name:", "name:", "strg:"]) + "*"
                 }
 
 def get_record_fields(d, k):

@@ -128,7 +128,7 @@ def get_record_fields(d, k):
     for key in d.keys():
         if retrieve_node(d, key) == "field_decl":
             if retrieve_field(d, key, "scpe:") == k:
-                arg = get_arg(d, key);
+                arg = get_arg(d, key)
                 res.append(arg)
     return res
 
@@ -169,6 +169,19 @@ def get_arg(d, k):
     #         "type_name": "unknown"
     #     }
 
+def get_return_expr(d, k):
+    returnType = resolve_path(d, k, ["expr:", "type:"])
+    if returnType == "integer_type":
+        return {
+            "type": resolve_path(d, k, ["expr:", "type:"]),
+            "type_name": resolve_path(d, k, ["expr:", "type:", "name:", "name:", "strg:"]),
+            }
+    elif returnType == "pointer_type":
+        return {
+            "type": resolve_path(d, k, ["expr:", "type:"]),
+            "type_name": resolve_path(d, k, ["expr:", "type:", "ptd:", "name:", "name:", "strg:"]) + "*"
+            }
+
 
 def simplify_dict(d):
     new_dict = {}
@@ -177,10 +190,7 @@ def simplify_dict(d):
     except:
         new_dict["name"] = None
     try:
-        new_dict["return_expr"] = {
-            "type": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:"]),
-            "type_name": resolve_path(d, get_type_ids(d, "return_expr")[0], ["expr:", "type:", "name:", "name:", "strg:"]),
-            }
+        new_dict["return_expr"] = get_return_expr(d, get_type_ids(d, "return_expr")[0])
     except:
         new_dict["return_expr"] = {
             "type": None,

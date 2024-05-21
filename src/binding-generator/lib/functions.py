@@ -2,6 +2,18 @@ from lib.components import *
 from lib.callbacks import CallbackHandler
 from lib.structs import StructHandler
 
+PUSH_FUNCTIONS = {
+    'integer_type': 'lua_pushinteger',
+    'real_type': 'lua_pushnumber',
+    'pointer_type': 'lua_pushstring',
+}
+
+POP_FUNCTIONS = {
+    'integer_type': 'lua_tointeger',
+    'real_type': 'lua_tonumber',
+    'pointer_type': 'lua_tostring',
+}
+
 class FunctionHandler():
     functionInfo: dict 
 
@@ -49,13 +61,16 @@ class FunctionHandler():
                     pack = structHandler.packStruct(structName, i+1)
                     afterCallCode = afterCallCode + pack 
                     returnCount = returnCount + 1
-                elif type_ == 'integer_type':
-                    externArgList.append(f'{arg["type_name"]} {arg["name"]}')
+                elif type_ in PUSH_FUNCTIONS:
+                    argType = arg['type_name']
+                    externArgList.append(f'{argType} {arg["name"]}')
+
+                    popFunction = POP_FUNCTIONS[type_]
 
                     x = Variable(
-                        'int',
+                        argType,
                         f'arg{i+1}',
-                        value=FunctionCall('lua_tonumber', ['L', i+1])
+                        value=FunctionCall(popFunction, ['L', i+1])
                     )
                     apiCallArgList.append(f'arg{i+1}')
                     wrapperCode = wrapperCode + x
@@ -79,7 +94,8 @@ class FunctionHandler():
                         'result',
                         value=apicall 
                     )
-                    wrapperCode = wrapperCode + result + FunctionCall('lua_pushinteger', ['L', 'result'], semicolon=True) 
+                    pushFunction = PUSH_FUNCTIONS[returnType]
+                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, ['L', 'result'], semicolon=True) 
                 
                 declaration = Function(
                     returnTypeName,

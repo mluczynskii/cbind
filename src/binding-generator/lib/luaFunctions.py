@@ -2,7 +2,10 @@ from lib.luaComponents import *
 from lib.functions import FunctionHandler
 
 class LuaFunctionHandler():
-    luaFunctionInfo: dict 
+    functionInfo: dict 
+
+    def needWrappers(self) -> bool:
+        return bool(self.functionInfo)
 
     def __init__(self, functionHandler: FunctionHandler) -> None:
         self.functionInfo = {}
@@ -31,6 +34,7 @@ class LuaFunctionHandler():
 
             if not info['void']:
                 wrapperCode = wrapperCode + LuaReturn('value')
+
             wrapper = LuaFunction(
                 f'CFunction.{apiName}',
                 arglist,

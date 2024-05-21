@@ -21,7 +21,7 @@ class FunctionHandler():
         self.functionInfo = {}
         for function in data:
             returnType = function['return_expr']['type']
-            if returnType == 'unknown':
+            if function['srcp'] != 'main.c':
                 continue
             externArgList, apiCallArgList = [], []
             wrapperCode, afterCallCode = Sequence(), Sequence()

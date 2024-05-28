@@ -3,15 +3,19 @@ from lib.callbacks import CallbackHandler
 from lib.structs import StructHandler
 
 PUSH_FUNCTIONS = {
-    'integer_type': 'lua_pushinteger',
-    'real_type': 'lua_pushnumber',
-    'pointer_type': 'lua_pushstring',
+    'int': 'lua_pushinteger',
+    'float': 'lua_pushnumber',
+    'double': 'lua_pushnumber',
+    'long': 'lua_pushinteger',
+    'short': 'lua_pushinteger'
 }
 
 POP_FUNCTIONS = {
-    'integer_type': 'lua_tointeger',
-    'real_type': 'lua_tonumber',
-    'pointer_type': 'lua_tostring',
+    'int': 'lua_tointeger',
+    'float': 'lua_tonumber',
+    'double': 'lua_tonumber',
+    'long': 'lua_tointeger',
+    'short': 'lua_tointeger'
 }
 
 class FunctionHandler():
@@ -20,9 +24,9 @@ class FunctionHandler():
     def __init__(self, data: dict, structHandler: StructHandler) -> None:
         self.functionInfo = {}
         for function in data:
-            returnType = function['return_expr']['type']
-            if function['srcp'] != 'main.c':
+            if function['srcp'] != 'main.c' and function['srcp'] != 'string.h':
                 continue
+            returnType = function['return_expr']['type']
             externArgList, apiCallArgList = [], []
             wrapperCode, afterCallCode = Sequence(), Sequence()
             returnCount = 1
@@ -61,11 +65,11 @@ class FunctionHandler():
                     pack = structHandler.packStruct(structName, i+1)
                     afterCallCode = afterCallCode + pack 
                     returnCount = returnCount + 1
-                elif type_ in PUSH_FUNCTIONS:
+                elif arg['type_name'] in PUSH_FUNCTIONS:
                     argType = arg['type_name']
                     externArgList.append(f'{argType} {arg["name"]}')
 
-                    popFunction = POP_FUNCTIONS[type_]
+                    popFunction = POP_FUNCTIONS[argType]
 
                     x = Variable(
                         argType,
@@ -74,6 +78,20 @@ class FunctionHandler():
                     )
                     apiCallArgList.append(f'arg{i+1}')
                     wrapperCode = wrapperCode + x
+                elif arg['type_name'] in ['char*', 'char']:
+                    argType = arg['type_name']
+                    externArgList.append(f'{argType} {arg["name"]}')
+
+                    x = Variable(
+                        'char*',
+                        f'arg{i+1}',
+                        value=FunctionCall('lua_tostring', ['L', i+1])
+                    )
+                    wrapperCode = wrapperCode + x
+                    apiCallArg = f'arg{i+1}'
+                    if argType == 'char':
+                        apiCallArg = f'*{apiCallArg}'
+                    apiCallArgList.append(apiCallArg)
                 else:
                     break 
             else:
@@ -94,8 +112,14 @@ class FunctionHandler():
                         'result',
                         value=apicall 
                     )
-                    pushFunction = PUSH_FUNCTIONS[returnType]
-                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, ['L', 'result'], semicolon=True) 
+                    res = 'result'
+                    if returnTypeName in PUSH_FUNCTIONS:
+                        pushFunction = PUSH_FUNCTIONS[returnTypeName]
+                    elif returnTypeName in ['char*', 'char']:
+                        pushFunction = 'lua_pushstring'
+                        if returnTypeName == 'char':
+                            res = f'&{res}'
+                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, ['L', res], semicolon=True) 
                 
                 declaration = Function(
                     returnTypeName,

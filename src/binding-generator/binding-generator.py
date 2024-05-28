@@ -11,7 +11,8 @@ import boilerplate
 HEADERS = [
     "lua.h",
     "lualib.h",
-    "lauxlib.h"
+    "lauxlib.h",
+    "pthread.h"
 ]
 
 def loadInfo(filename):

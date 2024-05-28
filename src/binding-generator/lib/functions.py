@@ -119,7 +119,11 @@ class FunctionHandler():
                         pushFunction = 'lua_pushstring'
                         if returnTypeName == 'char':
                             res = f'&{res}'
-                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, ['L', res], semicolon=True) 
+                    xs = ['L', res]
+                    if returnTypeName == 'char':
+                        pushFunction = 'lua_pushlstring'
+                        xs.append(1)
+                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, xs, semicolon=True) 
                 
                 declaration = Function(
                     returnTypeName,

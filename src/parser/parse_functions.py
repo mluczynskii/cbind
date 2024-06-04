@@ -169,14 +169,9 @@ def get_arg(d, k):
         return get_simple_type_entry(d, k)
     elif argType == "pointer_type":
         return get_pointer_type_entry(d, k)
-    elif argType == "record_type":
+    elif argType == "record_type" or argType == "union_type":
         return get_struct_type_entry(d, k)
-    # else:
-    #     return {
-    #         "name": "unknown",
-    #         "type": "unknown",
-    #         "type_name": "unknown"
-    #     }
+
 
 def get_return_expr(d, k):
     returnType = resolve_path(d, k, ["expr:", "type:"])

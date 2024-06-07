@@ -23,8 +23,7 @@ if args.functions != None:
     try: 
         f = open(args.functions, "r")
         functions = [fun.strip() for fun in  f.readlines()]
-        print(functions)
-    
+
     except FileNotFoundError:
         print("Could not open:", file_names)
         exit()
@@ -35,9 +34,6 @@ for file in file_names:
         f = open(file, "r")
         if(not validate_file(f)):
             raise Exception("Invalid input file")
-            #print("Invalid input file")
-
-        # res = json.dumps(run_parser(file), indent=2)
         res += run_parser(f, functions)
         f.close()
 

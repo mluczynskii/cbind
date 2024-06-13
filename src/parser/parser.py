@@ -10,26 +10,41 @@ parser = argparse.ArgumentParser(
 parser.add_argument("-o", "--output", help="name of the output file")
 parser.add_argument("-v", "--verbose", action="store_true", help="output result into terminal")
 parser.add_argument("--no-dump", action="store_true", help="do not produce output file")
-parser.add_argument("filename")
+parser.add_argument("filename", nargs="+", help="list of input files")
+parser.add_argument("-f", "--functions", help="file containing names of functions to include")
 args = parser.parse_args()
 
-file_name = args.filename
-res = None
-try:
+file_names = args.filename
 
-    file = open(file_name, "r")
-    if(not validate_file(file)):
-        raise Exception("Invalid input file")
-        #print("Invalid input file")
+res = []
+functions = []
 
-    res = json.dumps(run_parser(file), indent=2)
-    if args.verbose:
-        print(res)
-    file.close()
+if args.functions != None:
+    try: 
+        f = open(args.functions, "r")
+        functions = [fun.strip() for fun in  f.readlines()]
 
-except FileNotFoundError:
-    print("Could not open:", file_name)
-    exit()
+    except FileNotFoundError:
+        print("Could not open:", file_names)
+        exit()
+
+for file in file_names:
+    try:
+
+        f = open(file, "r")
+        if(not validate_file(f)):
+            raise Exception("Invalid input file")
+        res += run_parser(f, functions)
+        f.close()
+
+    except FileNotFoundError:
+        print("Could not open:", file_names)
+        exit()
+
+res = json.dumps(res, indent=2)
+
+if args.verbose:
+    print(res)
 
 if not args.no_dump:
     try:

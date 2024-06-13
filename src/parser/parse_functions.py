@@ -102,6 +102,15 @@ def collect_fptr_prms(d, k):
     else:
         return []
 
+def get_ptr_type_name(d, k):
+    res = ""
+    type_key = retrieve_field(d, k, "type:")
+    while retrieve_node(d, type_key) == "pointer_type":
+        res += "*"
+        type_key = retrieve_field(d, type_key, "ptd :")
+    res = resolve_path(d, type_key, ["name:", "name:", "strg:"]) + res
+    return res
+
 def get_pointer_type_entry(d, k):
     ptd = resolve_path(d, k, ["type:", "ptd:"])
     if ptd == 'function_type':
@@ -129,7 +138,7 @@ def get_pointer_type_entry(d, k):
         return {
                     "name": resolve_path(d, k, ["name:", "strg:"]),
                     "type": d[retrieve_field(d, k, "type:")][0],
-                    "type_name": resolve_path(d, k, ["type:", "ptd:", "name:", "name:", "strg:"]) + "*"
+                    "type_name": get_ptr_type_name(d, k)
                 }
 
 def get_record_fields(d, k):
@@ -169,14 +178,9 @@ def get_arg(d, k):
         return get_simple_type_entry(d, k)
     elif argType == "pointer_type":
         return get_pointer_type_entry(d, k)
-    elif argType == "record_type":
+    elif argType == "record_type" or argType == "union_type":
         return get_struct_type_entry(d, k)
-    # else:
-    #     return {
-    #         "name": "unknown",
-    #         "type": "unknown",
-    #         "type_name": "unknown"
-    #     }
+
 
 def get_return_expr(d, k):
     returnType = resolve_path(d, k, ["expr:", "type:"])
@@ -231,25 +235,26 @@ def validate_file(file):
     skip_empty(file)
     return re.search("^;; Function", peek_line(file)) != None
 
-def run_parser(file):
+def run_parser(file, functions=[]):
     file_size = get_file_size(file)
     skip_empty(file)
     res = []
     while(re.search("^;; Function", peek_line(file))):
-        dict = {}
         name = get_name(file.readline())
-        dict["@0"] = [name]
-        skip_to_nodes(file)
-        while(not (re.search("^;; Function", peek_line(file)) or eof(file, file_size))):
-            node = file.readline()
-            while(not (re.search("^@|^;; Function", peek_line(file)) or peek_line(file) == "\n")):
-                node += file.readline()
+        if len(functions) == 0 or name in functions:
+            fun_dict = {}
+            fun_dict["@0"] = [name]
+            skip_to_nodes(file)
+            while(not (re.search("^;; Function", peek_line(file)) or eof(file, file_size))):
+                node = file.readline()
+                while(not (re.search("^@|^;; Function", peek_line(file)) or peek_line(file) == "\n")):
+                    node += file.readline()
+                    skip_empty(file)
+                node = node.split()
                 skip_empty(file)
-            node = node.split()
-            skip_empty(file)
-            dict[node[0]] = node[1:]
-        # print(simplify_dict(dict))
-        dict = simplify_dict(dict)
-        if dict:
-            res.append(dict)
+                fun_dict[node[0]] = node[1:]
+            # print(simplify_dict(dict))
+            fun_dict = simplify_dict(fun_dict)
+            if fun_dict:
+                res.append(fun_dict)
     return res

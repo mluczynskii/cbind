@@ -15,6 +15,7 @@ AUTO_DIRECTORY = "auto"
 BINDING_FILE_NAME = "binding.c"
 BINDING_LUA_FILE_NAME = "binding.lua"
 TESTING_FILE = "main"
+FILTER_FILE = "filter.txt"
 
 VERBOSE = False
 KEEP_FILES = False
@@ -51,8 +52,13 @@ def compile_with_binding_error(result, message):
 def compile_with_binding(case):
     c_files = glob.glob("*.c.005t.original")
     c_file_arguments = " ".join(c_files)
-    
-    result1 = subprocess.run(["python3", PARSER_PATH] + c_files, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    if os.path.isfile(FILTER_FILE):
+        parser_args = ["python3", PARSER_PATH] + c_files + ["-f", FILTER_FILE]
+    else:
+        parser_args = ["python3", PARSER_PATH] + c_files
+
+    result1 = subprocess.run(parser_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     if result1.returncode != 0:
         return compile_with_binding_error(result1, "Parsing error:")

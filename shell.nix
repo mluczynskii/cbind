@@ -3,6 +3,7 @@ with import <nixpkgs> {}; {
     name = "dev-environment";
     buildInputs = [
         gcc13
+        libffcall
         python312
     ];
   };

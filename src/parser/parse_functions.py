@@ -257,4 +257,8 @@ def run_parser(file, functions=[]):
             fun_dict = simplify_dict(fun_dict)
             if fun_dict:
                 res.append(fun_dict)
+        else:
+            while(not (re.search("^;; Function", peek_line(file)) or eof(file, file_size)) ):
+                    file.readline()
+                    skip_empty(file)
     return res

@@ -6,6 +6,48 @@ from enum import Enum
 class Modifier(Enum):
     EXTERN='extern'
 
+class Type(Enum):
+    INTEGER='int'
+    FLOAT='float'
+    DOUBLE='double'
+    CHAR='char'
+    LONG='long'
+    SHORT='short'
+    STRING='char*'
+    VOID='void'
+    VOID_PTR='void*'
+    VA_LIST='va_alist'
+    STATE='lua_State*'
+
+class Direction(Enum):
+    PUSH = 'push'
+    POP = 'pop'
+
+def parseType(name: str) -> Type:
+    for type_ in Type:
+        if type_.value == name:
+            return type_
+    raise NotImplementedError(f'Unknown data type: {name}')
+
+def stackPushPop(type_: Type, dir: Direction) -> str:
+    if type_ in [Type.INTEGER, Type.SHORT, Type.LONG]:
+        if dir == Direction.PUSH:
+            return 'lua_pushinteger'
+        return 'lua_tointeger'
+    elif type_ in [Type.FLOAT, Type.DOUBLE]:
+        if dir == Direction.PUSH:
+            return 'lua_pushnumber'
+        return 'lua_tonumber'
+    elif type_ in [Type.STRING]:
+        if dir == Direction.PUSH:
+            return 'lua_pushstring'
+        return 'lua_tostring'
+    elif type_ in [Type.CHAR]:
+        if dir == Direction.PUSH:
+            return 'lua_pushstringl'
+        return 'lua_tostring'
+    raise NotImplementedError('Type not compatible with Lua')
+
 class Component(ABC):
     pass
  
@@ -14,7 +56,7 @@ class Sequence():
         self.content = args
 
     def __str__(self) -> str:
-        xs = map(str, self.content)
+        xs = map(lambda s : f'{s};', self.content)
         return '\n'.join(xs)
     
     def __add__(self, xs: Self | Component) -> Self:
@@ -24,10 +66,10 @@ class Sequence():
     
 @dataclass 
 class Block(Component):
-    seq: Sequence
+    content: Sequence
 
     def __str__(self) -> str:
-        return '{\n' + str(self.seq) + '\n}'
+        return '{\n' + str(self.content) + '\n}'
     
 @dataclass 
 class Include(Component):
@@ -53,85 +95,130 @@ class LuaRegister(Component):
 
 @dataclass
 class Variable(Component):
-    type_: str
+    type_: Type
     name: str
     array: Optional[bool] = False
     value: Optional[any] = None
 
     def __str__(self) -> str:
-        declaration = f'{self.type_} {self.name}'
+        var = f'{self.type_.value} {self.name}'
         if self.array:
-            declaration = declaration + '[]'
-        return declaration + (f' = {self.value};' if self.value else ';')
+            var = var + '[]'
+        if self.value:
+            var = var + f' = {self.value}'
+        return var
+    
+@dataclass 
+class Struct(Component):
+    structName: str 
+    variableName: str 
+    pointer: Optional[bool] = False 
+    array: Optional[bool] = False 
+    value: Optional[any] = None 
+
+    def __str__(self) -> str:
+        var = f'struct {self.structName}'
+        if self.pointer:
+            var = var + '*'
+        var = f'{var} {self.variableName}'
+        if self.array:
+            var = var + '[]'
+        if self.value:
+            var = f'{var} = {self.value}'
+        return var
+    
+@dataclass 
+class FunctionPointer(Component):
+    returnType: Type  
+    name: str 
+    args: list[Type]
+
+    def __str__(self) -> str:
+        arglist = map(lambda s : s.value, self.args)
+        arglist = ', '.join(arglist)
+        return f'{self.returnType} (*{self.name})({arglist})'
 
 @dataclass
 class Function(Component):
-    type_: str 
+    returnType: Type
     name: str 
-    args: list[str]
+    args: list[Variable | FunctionPointer]
     modifier: Optional[Modifier] = None
-    seq: Optional[Sequence] = None
+    content: Optional[Sequence] = None
 
     def __str__(self) -> str:
         mod = f'{self.modifier.value} ' if self.modifier else ''
-        arglist = ', '.join(self.args)
-        declaration = mod + f'{self.type_} {self.name}({arglist})'
-        if self.seq:
-            content = Block(self.seq)
-            return f'{declaration} {content}'
-        return f'{declaration};'
+        arglist = ', '.join(map(str, self.args))
+        func = mod + f'{self.returnType.value} {self.name}({arglist})'
+        if self.content:
+            content = Block(self.content)
+            func = f'{func} {content}'
+        return func 
 
 @dataclass
 class FunctionCall(Component):
     name: str
     args: list[any]
-    semicolon: Optional[bool] = False
 
     def __str__(self) -> str:
         xs = ', '.join(map(str, self.args))
-        return f'{self.name}({xs})' + (';' if self.semicolon else '')
+        return f'{self.name}({xs})'
 
 @dataclass
 class Return(Component):
     value: any 
 
     def __str__(self) -> str:
-        return f'return {self.value};'
+        return f'return {self.value}'
 
 @dataclass 
-class ContextChange(Component):
-    idx: int 
-
-    def __str__(self) -> str:
-        return f'c.stack = L; c.idx = {self.idx};'
-
-@dataclass 
-class FunctionPointer(Component):
-    type_: str 
-    name: str 
-    args: list[str]
-
-    def __str__(self) -> str:
-        arglist = ', '.join(self.args)
-        return f'{self.type_} (*{self.name})({arglist})'
-
-@dataclass 
-class Struct(Component):
+class StructDefinition(Component):
     name: str 
     fields: list[Variable]
 
     def __str__(self) -> str:
         declaration = f'struct {self.name}'
-        content = '\n'.join(map(str, self.fields))
-        return declaration + '{\n' + content + '\n};'
+        content = Sequence(*self.fields)
+        return declaration + '{\n' + str(content) + '\n}'
     
 @dataclass 
-class InitStruct(Component):
-    struct: str
-    name: str 
-    values: list[str]
+class Closure(Component):
+    functionType: FunctionPointer
+    prototypeName: str # name of the prototype function
+    containerName: str # data pointer passed to the closure
+    
+    def __str__(self) -> str:
+        alloc = FunctionCall(
+            'alloc_callback', 
+            [f'&{self.prototypeName}', self.containerName]
+        )
+        return f'{self.functionType} = {alloc}'
+    
+@dataclass 
+class StructAccess(Component):
+    varName: str 
+    fieldName: str 
+    pointer: Optional[bool] = True 
+    
+    def __str__(self) -> str:
+        join = '->' if self.pointer else '.'
+        return f'{self.varName}{join}{self.fieldName}'
+    
+@dataclass 
+class StructAssign(StructAccess):
+    value: any 
 
     def __str__(self) -> str:
-        values = ','.join(self.values)
-        return f'struct {self.struct} {self.name} = {{ {values} }};'
+        var = super.__str__()
+        return f'{var} = {self.value}'
+    
+@dataclass 
+class Casting(Component):
+    castType: Type | str 
+    value: any 
 
+    def __str__(self) -> str:
+        type_ = self.castType 
+        if isinstance(self.castType, Type):
+            type_ = self.castType.value 
+        return f'({type_})({self.value})'

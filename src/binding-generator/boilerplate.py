@@ -1,37 +1,23 @@
 code = """
-lua_State* L;
-pthread_mutex_t mut = PTHREAD_MUTEX_INITIALIZER;
 
-char* execScript(const char* filename) {
-pthread_mutex_lock(&mut);
-if (!L) return 1;
-int status = luaL_dofile(L, filename);
-char* result = lua_tostring(L, -1);
-pthread_mutex_unlock(&mut);
-return result;
+void* initLua(const char* modulename) {
+    lua_State* state = luaL_newstate();
+    luaL_openlibs(state);
+    lua_newtable(state);
+    luaL_setfuncs(state, &luareg, 0);
+    lua_setglobal(state, modulename);
+    return (void*)state;
 }
 
-char* execScriptLocal(const char* filename, const char* modulename) {
-lua_State* local_L = luaL_newstate();
-luaL_openlibs(local_L);
-lua_newtable(local_L);
-luaL_setfuncs(L, &luareg, 0);
-lua_setglobal(L, modulename);
-int status = luaL_dofile(L, filename);
-char* result = lua_tostring(L, -1);
-return result;
+char* execScript(void* state, const char* filename) {
+    lua_State* L = (lua_State*)state;
+    int status = luaL_dofile(L, filename);
+    char* result = lua_tostring(L, -1);
+    return result;
 }
 
-void initLua(const char* modulename) {
-L = luaL_newstate();
-luaL_openlibs(L);
-
-lua_newtable(L);
-luaL_setfuncs(L, &luareg, 0);
-lua_setglobal(L, modulename);
+void closeLua(void* state) {
+    lua_close((lua_State*)state);
 }
 
-void closeLua() {
-lua_close(L);
-}
 """

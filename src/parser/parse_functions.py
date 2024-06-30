@@ -203,7 +203,13 @@ def simplify_dict(d):
     except:
         new_dict["name"] = None
     try:
-        new_dict["return_expr"] = get_return_expr(d, get_type_ids(d, "return_expr")[0])
+        if len(get_type_ids(d, "return_expr")) != 0:
+            new_dict["return_expr"] = get_return_expr(d, get_type_ids(d, "return_expr")[0])
+        elif len(get_type_ids(d, "function_decl")) != 0:
+            new_dict["return_expr"] = {
+                "type": resolve_path(d, get_type_ids(d, "function_decl")[0], ["type:", "retn:"]),
+                "type_name": resolve_path(d, get_type_ids(d, "function_decl")[0], ["type:", "retn:", "name:", "name:", "strg:"])
+            }
     except:
         new_dict["return_expr"] = {
             "type": None,

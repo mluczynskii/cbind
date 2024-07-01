@@ -17,6 +17,13 @@ char* execScript(void* state, const char* filename) {
 }
 
 void closeLua(void* state) {
+    for (int idx = 0; idx < storageIdx; idx++) {
+        if (callbackStorage[idx] != 0) {
+            free_callback(callbackStorage[idx]);
+            free(dataStorage[idx]);
+        }
+    }
+    storageIdx = 0;
     lua_close((lua_State*)state);
 }
 

@@ -1,160 +1,155 @@
 from lib.components import *
-from lib.callbacks import CallbackHandler
 from lib.structs import StructHandler
+from lib.callbacks import CallbackHandler
+from typing import Tuple
 
-PUSH_FUNCTIONS = {
-    'int': 'lua_pushinteger',
-    'float': 'lua_pushnumber',
-    'double': 'lua_pushnumber',
-    'long': 'lua_pushinteger',
-    'short': 'lua_pushinteger'
-}
-
-POP_FUNCTIONS = {
-    'int': 'lua_tointeger',
-    'float': 'lua_tonumber',
-    'double': 'lua_tonumber',
-    'long': 'lua_tointeger',
-    'short': 'lua_tointeger'
-}
+STORAGE_SIZE = 20
 
 class FunctionHandler():
     functionInfo: dict 
 
-    def __init__(self, data: dict, structHandler: StructHandler) -> None:
+    def __init__(self, data: list, structHandler: StructHandler) -> None:
         self.functionInfo = {}
         for function in data:
-            if function['srcp'] != 'main.c' and function['srcp'] != 'string.h':
-                continue
-            returnType = function['return_expr']['type']
-            externArgList, apiCallArgList = [], []
-            wrapperCode, afterCallCode = Sequence(), Sequence()
+            name = function['name']
+            returnType = parseType(function['return_expr']['type_name'])
+            arguments = function['args']
+
+            apiCallArgList, externArgList = [], []
+            wrapperCode = Sequence()
             returnCount = 1
-            referenceIndex = []
-            argCount = len(function['args'])
-            for i, arg in enumerate(function['args']):
-                type_ = arg['type']
-                if type_ == 'fptr_type':
-                    info = arg['info']
-                    fptr = FunctionPointer(
-                        info['return_expr']['type_name'],
-                        arg['name'],
-                        [x['type_name'] for x in info['args']]
-                    )
-                    externArgList.append(str(fptr))
 
-                    callbackWrapperName = CallbackHandler.callbackWrapperName(arg['info'])
-                    apiCallArgList.append(f'&{callbackWrapperName}')
-                    wrapperCode = wrapperCode + ContextChange(i+1)
-                elif type_ == 'struct':
-                    structName = arg['type_name']
-                    externArgList.append(f'struct {structName} {arg["name"]}')
-
-                    unpack = structHandler.unpackStruct(structName, i+1)
-                    apiCallArgList.append(f'arg{i+1}')
-                    wrapperCode = wrapperCode + unpack 
-                elif type_ == 'structptr_type':
-                    referenceIndex.append(i+1)
-                    structName = arg['type_name']
-                    externArgList.append(f'struct {structName}* {arg["name"]}')
-
-                    unpack = structHandler.unpackStruct(structName, i+1)
-                    apiCallArgList.append(f'&arg{i+1}')
-                    wrapperCode = wrapperCode + unpack
-
-                    pack = structHandler.packStruct(structName, i+1)
-                    afterCallCode = afterCallCode + pack 
-                    returnCount = returnCount + 1
-                elif arg['type_name'] in PUSH_FUNCTIONS:
-                    argType = arg['type_name']
-                    externArgList.append(f'{argType} {arg["name"]}')
-
-                    popFunction = POP_FUNCTIONS[argType]
-
-                    x = Variable(
-                        argType,
-                        f'arg{i+1}',
-                        value=FunctionCall(popFunction, ['L', i+1])
-                    )
-                    apiCallArgList.append(f'arg{i+1}')
-                    wrapperCode = wrapperCode + x
-                elif arg['type_name'] in ['char*', 'char']:
-                    argType = arg['type_name']
-                    externArgList.append(f'{argType} {arg["name"]}')
-
-                    x = Variable(
-                        'char*',
-                        f'arg{i+1}',
-                        value=FunctionCall('lua_tostring', ['L', i+1])
-                    )
-                    wrapperCode = wrapperCode + x
-                    apiCallArg = f'arg{i+1}'
-                    if argType == 'char':
-                        apiCallArg = f'*{apiCallArg}'
-                    apiCallArgList.append(apiCallArg)
+            for idx, arg in enumerate(arguments):
+                argumentKind = arg['type']
+                argumentTypeName = arg.get('type_name', None)
+                argName = arg['name']
+                if argumentKind == 'fptr_type':
+                    code, component = FunctionHandler.fptrCode(arg, idx+1)
+                elif argumentKind == 'struct':
+                    code, component = FunctionHandler.structCode(structHandler, arg, idx+1)
+                elif argumentTypeName in ['char', 'char*']:
+                    code, component = FunctionHandler.charCode(arg, idx+1)
+                elif argumentKind in ['integer_type', 'real_type']:
+                    code, component = FunctionHandler.simpleCode(arg, idx+1)
                 else:
-                    break 
-            else:
-                apicall = FunctionCall(
-                    function['name'],
-                    apiCallArgList
-                )
-
-                if returnType == None:
-                    returnCount = returnCount - 1
-                    returnTypeName = 'void'
-                    apicall.semicolon = True 
-                    wrapperCode = wrapperCode + apicall
-                else:
-                    returnTypeName = function['return_expr']['type_name']
-                    result = Variable(
-                        returnTypeName,
-                        'result',
-                        value=apicall 
-                    )
-                    res = 'result'
-                    if returnTypeName in PUSH_FUNCTIONS:
-                        pushFunction = PUSH_FUNCTIONS[returnTypeName]
-                    elif returnTypeName in ['char*', 'char']:
-                        pushFunction = 'lua_pushstring'
-                        if returnTypeName == 'char':
-                            res = f'&{res}'
-                    xs = ['L', res]
-                    if returnTypeName == 'char':
-                        pushFunction = 'lua_pushlstring'
-                        xs.append(1)
-                    wrapperCode = wrapperCode + result + FunctionCall(pushFunction, xs, semicolon=True) 
+                    raise NotImplementedError(f'Unhandled argument type: {argumentTypeName}')
                 
-                declaration = Function(
-                    returnTypeName,
-                    function['name'],
-                    externArgList, 
-                    modifier=Modifier.EXTERN
+                if argumentTypeName == 'char':
+                    apiCallArgList.append(f'*{argName}')
+                else:
+                    apiCallArgList.append(argName)
+                externArgList.append(component)
+                wrapperCode = wrapperCode + code 
+
+            apiCall = FunctionCall(name, apiCallArgList)
+            if returnType != Type.VOID:
+                result = Variable(returnType, 'result', value=apiCall)
+                pushFunction = stackPushPop(returnType, Direction.PUSH)
+                pushArguments = ['state', '*result', 1] if returnType == 'char' else ['state', 'result']
+                push = FunctionCall(pushFunction, pushArguments)
+                wrapperCode = wrapperCode + result + push
+            else:
+                returnCount = returnCount - 1
+                wrapperCode = wrapperCode + apiCall 
+            
+            declaration = Function(returnType, name, externArgList, Modifier.EXTERN)
+            wrapperName = f'c_{name}'
+            wrapper = Function(
+                Type.INTEGER,
+                wrapperName, 
+                [Variable(Type.STATE, 'state')],
+                content=wrapperCode + Return(returnCount)
+            )
+            self.functionInfo[name] = {
+                'wrapperName': wrapperName,
+                'wrapper': wrapper,
+
+                'declaration': declaration
+            }
+
+    @staticmethod 
+    def simpleCode(arg: dict, idx: int) -> Tuple[Sequence, Variable]:
+        argType = parseType(arg['type_name'])
+        pop = stackPushPop(argType, Direction.POP)
+        var = Variable(
+            argType,
+            arg['name'],
+            value=FunctionCall(pop, ['state', idx])
+        )
+        code = Sequence(var)
+        return code, Variable(argType, arg['name'])
+                    
+    @staticmethod 
+    def structCode(structHandler: StructHandler, arg: dict, idx: int) -> Tuple[Sequence, Component]:
+        structName = arg['type_name']
+        return structHandler.unpackStruct(arg['name'], structName, idx) 
+
+    @staticmethod 
+    def charCode(arg: dict, idx: int) -> Tuple[Sequence, Variable]:
+        component = Variable(
+            Type.STRING,
+            arg['name'],
+            value=FunctionCall('lua_tostring', ['state', idx])
+        )
+        code = Sequence(component)
+        return code, Variable(Type.CHAR if arg['type_name'] == 'char' else Type.STRING, arg['name'])
+
+    @staticmethod 
+    def fptrCode(arg: dict, idx: int) -> Tuple[Sequence, FunctionPointer]:
+        code = Sequence()
+        code = code + FunctionCall('lua_pushvalue', ['state', idx])
+        registryKey = Variable(
+            Type.INTEGER,
+            'registry_key',
+            value=FunctionCall(
+                'luaL_ref',
+                ['state', 'LUA_REGISTRYINDEX']
+            )
+        )
+        data = Struct(
+            'container',
+            'data',
+            pointer=True,
+            value=Casting(
+                'struct container*',
+                FunctionCall(
+                    'malloc',
+                    ['sizeof(struct container)']
                 )
+            )
+        )
+        code = code + registryKey + data 
 
-                wrapperCode = wrapperCode + afterCallCode + Return(returnCount)
+        setState = StructAssign('data', 'state', 'state', pointer=True)
+        setRegistryKey = StructAssign('data', 'registry_key', 'registry_key', pointer=True)
+        code = code + setState + setRegistryKey 
 
-                wrapperName = f'c_{function["name"]}'
-                intermediateApiName = function['name']
-                if len(referenceIndex) > 0:
-                    intermediateApiName = f'{function["name"]}_ptr'
-                    wrapperName = wrapperName + '_ptr'
-
-                wrapper = Function(
-                    'int', 
-                    wrapperName, 
-                    ['lua_State* L'],
-                    seq=wrapperCode 
-                )
-                self.functionInfo[function['name']] = {
-                    'intermediateName': intermediateApiName,
-                    'wrapperName': wrapperName, 
-                    'argCount': argCount,
-                    'references': referenceIndex,
-                    'declaration': declaration,
-                    'wrapper': wrapper,
-                    'void': returnTypeName == 'void'
-                }
+        fptrInfo = arg['info']
+        returnType = parseType(fptrInfo['return_expr']['type_name'])
+        argTypes = [parseType(x['type_name']) for x in fptrInfo['args']]
+        helperName = CallbackHandler.callbackWrapperName(fptrInfo)
+        fptr = FunctionPointer(returnType, arg['name'], argTypes)
+        closure = Closure(fptr, helperName, 'data')
+        code = code + closure
+        code = code + ArrayAssign('callbackStorage', 'storageIdx', arg['name']) + ArrayAssign('dataStorage', 'storageIdx', 'data') + Increment('storageIdx')
+        return code, fptr
+    
+    @staticmethod
+    def defineCallbackStorage() -> Sequence:
+        fptrStorage = Variable(
+            Type.VOID_PTR, 
+            'callbackStorage',
+            array=True,
+            size=STORAGE_SIZE
+        )
+        dataStorage = Variable(
+            Type.VOID_PTR,
+            'dataStorage',
+            array=True,
+            size=STORAGE_SIZE 
+        )
+        idx = Variable(Type.INTEGER, 'storageIdx', value=0)
+        return Sequence(fptrStorage, dataStorage, idx)
 
     def declareFunctions(self) -> Sequence:
         seq = Sequence()
@@ -170,6 +165,6 @@ class FunctionHandler():
 
     def defineRegister(self) -> LuaRegister:
         functions = {}
-        for apiName, info in self.functionInfo.items():
-            functions[info['intermediateName']] = info['wrapperName'] 
+        for name, info in self.functionInfo.items():
+            functions[name] = info['wrapperName'] 
         return LuaRegister('luareg', functions) 

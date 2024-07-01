@@ -1,5 +1,10 @@
 from lib.components import *
 
+def va_suffix(type_: Type) -> str:
+    if type_ in [Type.CHAR, Type.DOUBLE, Type.FLOAT, Type.INTEGER, Type.LONG, Type.SHORT, Type.VOID]:
+        return type_.value
+    raise NotImplementedError(f'Unhandled return type: {type_.value}')
+
 class CallbackHandler():
     callbacksInfo: dict
 
@@ -16,36 +21,75 @@ class CallbackHandler():
 
     @staticmethod
     def callbackWrapperName(info: dict) -> str:
-        return_ = info["return_expr"]["type_name"]
-        args = ''.join( [arg["type_name"] for arg in info["args"]] )
+        return_ = info['return_expr']['type_name']
+        args = ''.join( [arg['type_name'] for arg in info['args']] )
         return f'{return_}_{args}'
     
     @staticmethod
     def callbackWrapper(info: dict, name: str) -> Function:
-        args = [f'{arg["type_name"]} arg{i+1}' for i, arg in enumerate(info["args"])]
+        argTypes = [parseType(arg['type_name']) for arg in info['args']]
+        returnType = parseType(info['return_expr']['type_name'])
 
         content = Sequence()
-        content = content + FunctionCall('lua_pushvalue', ['c.stack', 'c.idx'], semicolon=True)
 
-        for i in range(len(args)):
-            pushArg = FunctionCall(
-                'lua_pushinteger', 
-                ['c.stack', f'arg{i+1}'], 
-                semicolon=True
-            )
-            content = content + pushArg
+        container = Struct(
+            'container',
+            'c',
+            pointer=True,
+            value=Casting('struct container*', 'data')
+        )
+        content = content + container 
 
-        pcall = FunctionCall(
-            'lua_pcall', 
-            ['c.stack', len(args), 1, 0], 
-            semicolon=True
+        registryKey = Variable(
+            Type.INTEGER,
+            'registry_key',
+            value=StructAccess('c', 'registry_key')
         )
-        pop = FunctionCall(
-            'lua_tonumber', 
-            ['c.stack', -1]
+        state = Variable(
+            Type.STATE,
+            'state',
+            value=StructAccess('c', 'state')
         )
-        content = content + pcall + Return(pop)
-        return Function(info["return_expr"]["type_name"], name, args, seq=content)
+        content = content + registryKey + state 
+
+        # callback fetching from the lua register
+        fpush = FunctionCall(
+            'lua_rawgeti',
+            ['state', 'LUA_REGISTRYINDEX', 'registry_key']
+        )
+        content = content + fpush
+
+        # argument fetching
+        typeSuffix = va_suffix(returnType)
+        start = FunctionCall(f'va_start_{typeSuffix}', ['args'])
+        content = content + start
+        for idx, argType in enumerate(argTypes):
+            argTypeSuffix = va_suffix(argType)
+            fetch = FunctionCall(f'va_arg_{argTypeSuffix}', ['args'])
+            argument = Variable(argType, f'arg{idx}', value=fetch)
+            content = content + argument
+
+        # argument pushing 
+        for idx, argType in enumerate(argTypes):
+            push = stackPushPop(argType, Direction.PUSH)
+            content = content + FunctionCall(push, ['state', f'arg{idx}'])
+
+        pcall = FunctionCall('lua_pcall', ['state', len(argTypes), 1, 0])
+        popFunction = stackPushPop(returnType, Direction.POP)
+        pop = FunctionCall(popFunction, ['state', -1])
+        result = Variable(returnType, 'result', value=pop)
+        end = FunctionCall(f'va_return_{typeSuffix}', ['args', 'result'])
+        content = content + pcall + result + end + Return('result')
+
+        data = Variable(Type.VOID_PTR, 'data')
+        args = Variable(Type.VA_LIST, 'args')
+        wrapper = Function(
+            returnType,
+            name,
+            [data, args],
+            content=content
+        )
+        return wrapper
     
     def defineCallbacks(self) -> Sequence:
         seq = Sequence()

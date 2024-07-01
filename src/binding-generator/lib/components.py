@@ -80,6 +80,14 @@ class Include(Component):
         if not self.system:
             return f'#include "{self.name}"'
         return f'#include <{self.name}>'
+    
+@dataclass 
+class Define(Component):
+    macroName: str 
+    value: any 
+
+    def __str__(self) -> str:
+        return f'#define {self.macroName} {self.value}'
 
 @dataclass
 class LuaRegister(Component):
@@ -98,13 +106,17 @@ class Variable(Component):
     type_: Type
     name: str
     array: Optional[bool] = False
+    size: Optional[int] = 0
     value: Optional[any] = None
 
     def __str__(self) -> str:
         var = f'{self.type_.value} {self.name}'
         if self.array:
-            var = var + '[]'
-        if self.value:
+            if self.size != 0:
+                var = var + f'[{self.size}]'
+            else: 
+                var = var + '[]'
+        if self.value != None:
             var = var + f' = {self.value}'
         return var
     
@@ -123,7 +135,7 @@ class Struct(Component):
         var = f'{var} {self.variableName}'
         if self.array:
             var = var + '[]'
-        if self.value:
+        if self.value != None:
             var = f'{var} = {self.value}'
         return var
     
@@ -136,7 +148,7 @@ class FunctionPointer(Component):
     def __str__(self) -> str:
         arglist = map(lambda s : s.value, self.args)
         arglist = ', '.join(arglist)
-        return f'{self.returnType} (*{self.name})({arglist})'
+        return f'{self.returnType.value} (*{self.name})({arglist})'
 
 @dataclass
 class Function(Component):
@@ -205,11 +217,15 @@ class StructAccess(Component):
         return f'{self.varName}{join}{self.fieldName}'
     
 @dataclass 
-class StructAssign(StructAccess):
+class StructAssign(Component):
+    varName: str 
+    fieldName: str 
     value: any 
+    pointer: Optional[bool] = True
 
     def __str__(self) -> str:
-        var = super.__str__()
+        join = '->' if self.pointer else '.'
+        var = f'{self.varName}{join}{self.fieldName}'
         return f'{var} = {self.value}'
     
 @dataclass 
@@ -222,3 +238,19 @@ class Casting(Component):
         if isinstance(self.castType, Type):
             type_ = self.castType.value 
         return f'({type_})({self.value})'
+    
+@dataclass 
+class ArrayAssign(Component):
+    varName: str 
+    idx: any
+    value: any 
+
+    def __str__(self) -> str:
+        return f'{self.varName}[{self.idx}] = {self.value}'
+    
+@dataclass 
+class Increment(Component):
+    varName: str 
+
+    def __str__(self) -> str:
+        return f'{self.varName}++'

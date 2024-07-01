@@ -13,9 +13,9 @@ int sub(int x, int y){
 int main(int argc, char** argv) {
     char *file_name = argv[1];
 
-    initLua("CFunction");
-    printf("%s", execScript(file_name));
-    closeLua();
+    void* state = initLua("CFunction");
+    printf("%s", execScript(state, file_name));
+    closeLua(state);
 
     return 0;
 }

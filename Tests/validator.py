@@ -63,7 +63,7 @@ def compile_with_binding(case):
     if result1.returncode != 0:
         return compile_with_binding_error(result1, "Parsing error:")
     
-    result2 = subprocess.run(["python3", GENERATOR_PATH, "data.json", f"./{BINDING_FILE_NAME}", f"./{BINDING_LUA_FILE_NAME}"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    result2 = subprocess.run(["python3", GENERATOR_PATH, "data.json", "-o binding"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     if result2.returncode != 0:
         return compile_with_binding_error(result2, "Code Generating error:")

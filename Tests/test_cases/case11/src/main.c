@@ -2,20 +2,20 @@
 #include <string.h>
 #include "lua_binding_api.h"
 
-float div(float a, float b){
+float my_div(float a, float b){
     return a/b;
 }
 
-float mult(float a, float b){
+float my_mult(float a, float b){
     return a*b;
 }
 
 int main(int argc, char** argv) {
     char *file_name = argv[1];
 
-    initLua("CFunction");
-    printf("%s", execScript(file_name));
-    closeLua();
+    void* state = initLua("CFunction");
+    printf("%s", execScript(state, file_name));
+    closeLua(state);
 
     return 0;
 }

@@ -45,7 +45,7 @@ class FunctionHandler():
             if returnType != Type.VOID:
                 result = Variable(returnType, 'result', value=apiCall)
                 pushFunction = stackPushPop(returnType, Direction.PUSH)
-                pushArguments = ['state', '*result', 1] if returnType == 'char' else ['state', 'result']
+                pushArguments = ['state', '&result', 1] if function['return_expr']['type_name'] == 'char' else ['state', 'result']
                 push = FunctionCall(pushFunction, pushArguments)
                 wrapperCode = wrapperCode + result + push
             else:

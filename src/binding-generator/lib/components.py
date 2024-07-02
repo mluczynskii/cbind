@@ -44,7 +44,7 @@ def stackPushPop(type_: Type, dir: Direction) -> str:
         return 'lua_tostring'
     elif type_ in [Type.CHAR]:
         if dir == Direction.PUSH:
-            return 'lua_pushstringl'
+            return 'lua_pushlstring'
         return 'lua_tostring'
     raise NotImplementedError('Type not compatible with Lua')
 

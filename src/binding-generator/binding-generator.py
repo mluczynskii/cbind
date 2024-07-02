@@ -76,7 +76,8 @@ def main():
     functionHandler = FunctionHandler(data, structHandler)
     #luaFunctionHandler = LuaFunctionHandler(functionHandler)
 
-    outputName = 'binding.c' if not args.output else args.output
+    outputName = 'binding' if not args.output else args.output
+    outputName = outputName.strip()
     with open(f'{outputName}.c', 'w') as output:
         writeHeaders(output)
         writeDeclarations(output, structHandler, functionHandler)

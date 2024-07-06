@@ -1,0 +1,2 @@
+add_function
+delete_function

@@ -1,4 +1,4 @@
-local path = "test_cases/case14/auto/"
+local path = "test_cases/case13/auto/"
 
 function sleep(n)
     os.execute("sleep " .. tonumber(n))
@@ -6,6 +6,7 @@ end
 
 function print_one()
     os.execute("echo '1' >> " .. path .. "in")
+    return 0
 end
 
 function clean_input_file()

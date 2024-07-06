@@ -8,10 +8,11 @@
 
 pthread_mutex_t lock;
 bool running = true;
+void* state;
 
-void (*functions[buff_size])();
+int (*functions[buff_size])();
 
-void add_function(void (*f)(), int i){
+void add_function(int (*f)(), int i){
     pthread_mutex_lock(&lock);
     functions[i] = f;
     pthread_mutex_unlock(&lock);
@@ -41,7 +42,7 @@ void* call_functions(void* arg){
 void* event_listener(void* arg) {
     char *file_name = (char *)arg;
 
-    printf("%s", execScript(file_name));
+    printf("%s", execScript(state, file_name));
 
     running = false;
 
@@ -52,7 +53,7 @@ int main(int argc, char** argv){
     char *file_name = argv[1];
     pthread_t thread1, thread2;
 
-    initLua("CFunction");
+    state = initLua("CFunction");
 
     if (pthread_mutex_init(&lock, NULL) != 0) {
         printf("Mutex initialization error\n");
@@ -68,5 +69,5 @@ int main(int argc, char** argv){
 
     pthread_mutex_destroy(&lock);
 
-    closeLua();
+    closeLua(state);
 }

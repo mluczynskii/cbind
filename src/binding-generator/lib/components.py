@@ -18,6 +18,7 @@ class Type(Enum):
     VOID_PTR='void*'
     VA_LIST='va_alist'
     STATE='lua_State*'
+    SIZE='size_t'
 
 class Direction(Enum):
     PUSH = 'push'
@@ -30,7 +31,7 @@ def parseType(name: str) -> Type:
     raise NotImplementedError(f'Unknown data type: {name}')
 
 def stackPushPop(type_: Type, dir: Direction) -> str:
-    if type_ in [Type.INTEGER, Type.SHORT, Type.LONG]:
+    if type_ in [Type.INTEGER, Type.SHORT, Type.LONG, Type.SIZE]:
         if dir == Direction.PUSH:
             return 'lua_pushinteger'
         return 'lua_tointeger'

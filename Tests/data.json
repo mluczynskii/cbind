@@ -1,0 +1,46 @@
+[
+  {
+    "name": "increment",
+    "return_expr": {
+      "type": "void_type",
+      "type_name": "void"
+    },
+    "srcp": "main.c",
+    "args": [
+      {
+        "name": "cnt",
+        "type": "structptr_type",
+        "type_name": "Counter",
+        "fields": [
+          {
+            "name": "val",
+            "type": "integer_type",
+            "type_name": "int"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "decrement",
+    "return_expr": {
+      "type": "void_type",
+      "type_name": "void"
+    },
+    "srcp": "main.c",
+    "args": [
+      {
+        "name": "cnt",
+        "type": "structptr_type",
+        "type_name": "Counter",
+        "fields": [
+          {
+            "name": "val",
+            "type": "integer_type",
+            "type_name": "int"
+          }
+        ]
+      }
+    ]
+  }
+]

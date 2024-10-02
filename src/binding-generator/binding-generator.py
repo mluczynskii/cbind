@@ -48,6 +48,12 @@ def writeDeclarations(file, structHandler, functionHandler):
 
     structDeclarations = structHandler.declareStructs()
     file.write(f'{structDeclarations}\n\n')
+    constructors = structHandler.declareConstructors()
+    file.write(f'{constructors}\n\n')
+    setters = structHandler.declareSetters()
+    file.write(f'{setters}\n\n')
+    getters = structHandler.declareGetters()
+    file.write(f'{getters}\n\n')
 
     functionDeclarations = functionHandler.declareFunctions()
     file.write(f'{functionDeclarations}\n\n')

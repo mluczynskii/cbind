@@ -26,7 +26,9 @@ class FunctionHandler():
                 if argumentKind == 'fptr_type':
                     code, component = FunctionHandler.fptrCode(arg, idx+1)
                 elif argumentKind == 'struct':
-                    code, component = FunctionHandler.structCode(structHandler, arg, idx+1)
+                    code, component = FunctionHandler.structCode(structHandler, arg, idx+1, False)
+                elif argumentKind == 'structptr_type':
+                    code, component = FunctionHandler.structCode(structHandler, arg, idx+1, True)
                 elif argumentTypeName in ['char', 'char*']:
                     code, component = FunctionHandler.charCode(arg, idx+1)
                 elif argumentKind in ['integer_type', 'real_type']:
@@ -34,7 +36,7 @@ class FunctionHandler():
                 else:
                     raise NotImplementedError(f'Unhandled argument type: {argumentTypeName}')
                 
-                if argumentTypeName == 'char':
+                if argumentTypeName == 'char' or argumentKind == 'struct':
                     apiCallArgList.append(f'*{argName}')
                 else:
                     apiCallArgList.append(argName)
@@ -80,9 +82,9 @@ class FunctionHandler():
         return code, Variable(argType, arg['name'])
                     
     @staticmethod 
-    def structCode(structHandler: StructHandler, arg: dict, idx: int) -> Tuple[Sequence, Component]:
+    def structCode(structHandler: StructHandler, arg: dict, idx: int, ptr: bool) -> Tuple[Sequence, Component]:
         structName = arg['type_name']
-        return structHandler.unpackStruct(arg['name'], structName, idx) 
+        return structHandler.unpackStruct(arg['name'], structName, idx, ptr) 
 
     @staticmethod 
     def charCode(arg: dict, idx: int) -> Tuple[Sequence, Variable]:

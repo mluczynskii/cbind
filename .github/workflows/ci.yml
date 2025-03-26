@@ -17,10 +17,10 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Set up build tools for Lua and C
+      - name: Set up build tools/dependencies for Lua and C
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libreadline-dev gcc
+          sudo apt-get install -y build-essential libreadline-dev gcc libffcall-dev
 
       - name: Download and build Lua
         run: |

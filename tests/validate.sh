@@ -1,10 +1,9 @@
 #!/bin/bash
-mkdir build
-gcc -c src/api.c -I./include -fdump-tree-original-raw=build/api.c.005t.original -o build/api.o
-python3 ../cbind/parser.py build/api.c.005t.original
-mv dump.json build/dump.json
-python3 ../cbind/main.py build/dump.json -o src/binding.c
+gcc -c src/api.c -I./include -fdump-tree-original-raw -o api.o
+python3 ../cbind/parser.py api.c.005t.original
+python3 ../cbind/main.py dump.json -o src/binding.c
 make main
+make clean
 
 # TODO: loop over cases
 ./main scripts/case_1.lua

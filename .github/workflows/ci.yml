@@ -11,13 +11,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Pull docker image
-        run: |
-          docker pull mluczynski/cbind:latest
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Debug contents of the container
+      - name: Build docker image
         run: |
-          docker run --rm mluczynski/cbind:latest /bin/bash -c "pwd && mkdir tests/build && ls -la . tests"
+          docker build --no-cache -t mluczynski/cbind:latest .
 
       - name: Run tests
         run: |

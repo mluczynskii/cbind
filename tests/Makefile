@@ -8,14 +8,22 @@ DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 OBJ = api.o binding.o main.o
 
-CC=gcc
 CFLAGS=-I$(IDIR) -I/usr/local/include -L/usr/local/lib
 
+api.c.005t.original: $(SDIR)/api.c
+	gcc -c -fdump-tree-original-raw $(SDIR)/api.c $(CFLAGS)
+
+dump.json: api.c.005t.original 
+	python3 ../cbind/parser.py api.c.005t.original
+
+$(SDIR)/binding.c: dump.json 
+	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c
+
 %.o: $(SDIR)/%.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+	gcc -c -o $@ $< $(CFLAGS)
 
 main: $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS) $(LIBS)
+	gcc -o $@ $^ $(CFLAGS) $(LIBS)
 
 .PHONY: clean distclean
 

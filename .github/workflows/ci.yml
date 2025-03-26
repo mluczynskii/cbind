@@ -15,12 +15,8 @@ jobs:
         run: |
           docker pull mluczynski/cbind:latest
 
-      - name: Run docker container
-        run: |
-          docker run --rm mluczynski/cbind:latest
-
       - name: Run tests
         run: |
-          docker run --rm mluczynski/cbind:latest cd tests && ./validate.sh
+          docker run --rm mluczynski/cbind:latest /bin/bash -c "cd tests && ./validate.sh"
 
       

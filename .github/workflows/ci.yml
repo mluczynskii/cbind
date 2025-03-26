@@ -1,0 +1,42 @@
+name: Run tests
+
+on:
+  push:
+    branches: master
+
+jobs: 
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Set up build tools for Lua and C
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libreadline-dev gcc
+
+      - name: Download and build Lua
+        run: |
+          curl -L -R -O https://www.lua.org/ftp/lua-5.4.7.tar.gz
+          tar zxf lua-5.4.7.tar.gz
+          cd lua-5.4.7
+          make linux install
+
+      - name: Check Lua installation
+        run: |
+          lua -v
+          ls /usr/local/lib | grep liblua
+
+      - name: Build and run tests
+        run: |
+          cd tests
+          bash validate.sh
+
+      

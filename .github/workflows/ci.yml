@@ -17,7 +17,7 @@ jobs:
 
       - name: Debug contents of the container
         run: |
-          docker run --rm mluczynski/cbind:latest /bin/bash -c "pwd && ls -la . tests"
+          docker run --rm mluczynski/cbind:latest /bin/bash -c "pwd && mkdir tests/build && ls -la . tests"
 
       - name: Run tests
         run: |

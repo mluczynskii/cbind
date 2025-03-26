@@ -6,38 +6,21 @@ on:
 
 jobs: 
   test:
-    runs-on: archlinux-latest
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-
-      - name: Set up build tools/dependencies for Lua and C
+      - name: Pull docker image
         run: |
-          sudo pacman -Syu --no-confirm 
-          sudo pacman -S --no-confirm base-devel gcc ffcall
+          docker pull mluczynski/cbind:latest
 
-      - name: Download and build Lua
+      - name: Run docker container
         run: |
-          curl -L -R -O https://www.lua.org/ftp/lua-5.4.7.tar.gz
-          tar zxf lua-5.4.7.tar.gz
-          cd lua-5.4.7
-          sudo make linux install
+          docker run --rm mluczynski/cbind:latest
 
-      - name: Check Lua and gcc installation
+      - name: Run tests
         run: |
-          lua -v
-          ls /usr/local/lib | grep liblua
-          gcc --version
-
-      - name: Build and run tests
-        run: |
-          cd tests
-          bash validate.sh
+          docker run --rm mluczynski/cbind:latest cd tests && ./validate.sh
 
       

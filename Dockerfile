@@ -3,7 +3,7 @@ FROM archlinux:latest
 LABEL maintainer="mateusz.luczynski02@gmail.com"
 
 RUN pacman -Syu --noconfirm \
-  && pacman -S --noconfirm python gcc base-devel git \
+  && pacman -S --noconfirm python gcc ffcall base-devel git \
   && pacman -Scc --noconfirm
 
 RUN curl -L -R https://www.lua.org/ftp/lua-5.4.7.tar.gz -o /tmp/lua-5.4.7.tar.gz \

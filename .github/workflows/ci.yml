@@ -6,7 +6,7 @@ on:
 
 jobs: 
   test:
-    runs-on: ubuntu-latest
+    runs-on: archlinux-latest
 
     steps:
       - name: Checkout code
@@ -19,8 +19,8 @@ jobs:
 
       - name: Set up build tools/dependencies for Lua and C
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libreadline-dev gcc-14.2.1 libffcall-dev
+          sudo pacman -Syu --no-confirm 
+          sudo pacman -S --no-confirm base-devel gcc ffcall
 
       - name: Download and build Lua
         run: |

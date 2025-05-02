@@ -10,11 +10,11 @@ OBJ = api.o binding.o main.o
 
 CFLAGS=-I$(IDIR) -I/usr/local/include -L/usr/local/lib
 
-api.c.005t.original: $(SDIR)/api.c
-	gcc -c -fdump-tree-original-raw $(SDIR)/api.c $(CFLAGS)
+api.c.original: $(SDIR)/api.c
+	gcc -c -fdump-tree-original-raw=api.c.original $(SDIR)/api.c $(CFLAGS)
 
-dump.json: api.c.005t.original 
-	python3 ../cbind/parser.py api.c.005t.original
+dump.json: api.c.original 
+	python3 ../cbind/parser.py api.c.original
 
 $(SDIR)/binding.c: dump.json 
 	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c

@@ -1,5 +1,6 @@
 \documentclass[polish, english]{iithesis}
 \usepackage{listings}
+\usepackage{csquotes}
 
 \lstdefinelanguage{json}{
   basicstyle=\normalfont\ttfamily,
@@ -64,9 +65,100 @@ Now, we would like to be able to pass callbacks written in Lua to the \textit{re
 That way, the \textit{scheduler's} reactions for different events can be easily swapped and modified. 
 At the same time, we would like the Lua components to be able to use functionality available to standard callbacks passed from within the application code, like a series of curated API calls using even user-defined C data structures.
 \chapter{Lua C API overview}
+  The 4th edition of the \textit{Programming in Lua} book says:
+  \begin{displaycquote}{pil4}
+    Lua is an \textit{embedded language}. 
+    This means that Lua is not a stand-alone application, but a library that we can link with other applications to incorporate Lua facilities into them.
+
+    [\ldots] This ability to be used as a library to extend an application is what makes Lua an \textit{embeddable} language. 
+    At the same time, a program that uses Lua can register new functions in the Lua environment; such functions are implemented in C (or another language), so that they can add facilities that cannot be written directly in Lua. 
+    This is what makes Lua an \textit{extensible} language. 
+  \end{displaycquote}
+  Both approaches utilize the so-called \textit{C API} to communicate with Lua.
+  To understand how we can use this API to achieve our goal, we first need to take a look at its possibilities.
   \section{Core concepts}
+    At its core, the C API is just a collection of functions, constants and types that allow C programs to interact with the Lua interpreter.
+    This includes, among other things, running pieces of Lua code and accessing Lua global variables.
+    The main actor allowing this type of communication is called the virtual \textit{stack}.
+    From Lua perspective, the stack behaves as we would expect a stack to work --- that is the elements are added and removed only from the top of it.
+    From the C perspective however, the `stack' is more than a traditional LIFO data structure, as random access is possible. 
+    Almost every API call operates on values present on the stack, and all data is exchanged through it (from C to Lua and the other way around).  
+    Each slot on the stack can hold any Lua value.
+    When we want to get some value from Lua, we can ask for it and receive it on the stack.
+    In a similiar manner, when we want to pass something to Lua, we first have to push it onto the stack.
+    There is a collection of calls doing the pushing and popping operations, defined for different C types.
+    The responsibility of using the correct ones falls on the C programmer.
+    The API also provides a way of manipulating the stack in more \textit{unusual} ways, like replacing or inserting elements in arbitrary places and even element rotation similiar to the one performed bit-wise by assembly instructions like \texttt{ROR} or \texttt{ROL}.
+    It is also worth noting that the stack is \emph{not} a global structure --- each separate interaction (that is for example, a foreign function call) gets its own, local stack.
+
+    The stack approach prevents the combinatorial explosion of the API calls (one for each type combination), and also removes any concern about garbage collection --- the Lua runtime has exact knowledge about the use of variables stored on the stack and so it will not accidentaly collect them.
+    It also lets us deal with the mismatch between the type systems (dynamic in Lua and static in C).
+    The only price to pay is the need to manually check the correctness of every operation, and having to deal with non-descriptive memory errors when something goes wrong, with the latter being especially common without exerting special care.
   \section{Calling C functions from Lua scripts}
-  \section{Obstacles and limitations}
+    For Lua script to be able to call a function written in C, the function must follow a very simple protocol.
+    Let's look at an example provided in \textit{Programming in Lua}\cite{pil4}:
+    \begin{lstlisting}[caption=Example C function to be called from Lua, language=C]
+      static int l_sin (lua_State *L) {
+        double d = lua_tonumber(L, 1); /* get argument */
+        lua_pushnumber(L, sin(d)); /* push result */
+        return 1; /* number of results */
+      }
+    \end{lstlisting}
+    Every eligible function has to have the same prototype --- it has to return an int and accept an argument of type \lstinline[language=C]|lua_State*|.
+    The single argument is in fact the stack described previously.
+    As we can see, the body of the function consists of:
+    \begin{enumerate}
+      \item Fetching the passed arguments. 
+        This step is more complicated for more complex types, but here we only need a single real number \textit{d}.
+        Each argument, when passed from Lua, gets its unique index on the stack (starting from one and counting up).
+        When fetching the argument we need to specify the correct index.
+        In the provided example, type checking and error handling is omitted.
+      \item Pushing the result back on the stack.
+        Since we are implementing a simple sine function here, we simply apply it to the argument and push it on top of the stack.
+      \item Returning the number of `returned' values.
+        This way the Lua runtime will know how many values it needs to take from the top of the stack (here --- only one).
+        After that, the rest of the stack is cleared and the script execution is resumed.
+    \end{enumerate}
+    Before we can do anything with this function though, we need to register it.
+    In order to do that, we can mimic the behavior of Lua modules and create our own from within the C code.
+    In order to do that, we have to declare an array describing the module somewhere in our code.
+    \begin{lstlisting}[language=C, caption=Module declaration]
+      static const struct luaL_Reg mylib [] = {
+        {"sin", l_sin},
+        {NULL, NULL} /* sentinel */
+      };
+    \end{lstlisting}
+    We now have two ways of continuing.
+    We can either link our module dynamically, that is by compiling it into a shared library (\texttt{.so}, \texttt{.dll}) and including it in a Lua script using the keyword \texttt{require}, or register the function as a global Lua variable using a combination of \texttt{lua\_pushfunction} and \texttt{lua\_setglobal} API calls. 
+    The second approach assumes that we will run the Lua interpreter from within the C program that registers the function.
+    The first approach requires putting an additional function into our source code:
+    \begin{lstlisting}[language=C, caption=The \texttt{luaopen\_mylib} function]
+      int luaopen_mylib (lua_State *L) {
+        luaL_newlib(L, mylib);
+        return 1;
+      }
+    \end{lstlisting}
+    This function gets automatically called after including the module with \texttt{require}.
+    No matter the approach, we can then call our function from within a Lua script by calling \texttt{mylib.sin}.
+  \section{Some obstacles and limitations}
+    Even though the API makes exchanging data pretty straightforward, there are still some considerations we need to take into account.
+    First of all, we already mentioned how to the type system differs between Lua and C.
+    More specifically, let's look at how we can implement some more complex data structures in both worlds.
+
+    In C, we would typically create a \texttt{struct} or an \texttt{union} to represent a data structure.
+    Then, we could introduce a series of functions doing operations on instances of such data types.
+    In Lua however, we do not have a strict equivalent of C \texttt{structs}.
+    The main way of achieving something similiar is done through the use of Lua's associative tables.
+    This is not what we want though --- we want to use actual instances of our API's \texttt{structs}, not their cheap knockoffs.
+    The solution is creating default constructors for each introduced data type, along with some utility functions (\textit{setters} and \textit{getters}).
+    This is done through a special API data type called \textit{userdata} and is explained in more detail later.
+    This way we can create \texttt{structs} and manipulate them from within Lua.
+
+    Another problem is related to passing callbacks from Lua to C.
+    In Lua, functions are \textit{first class citizens} and we can pass them as arguments to other functions, including those introduced by our binding code.
+    For C functions, that is not the case, even though we have something very similiar --- function pointers.
+    Our problem is figuring out a way to pass a C function pointer to an API function, that when dereferenced and called executes the function passed on the stack from within a Lua script.
+
 \chapter{AST generated by the compiler}
 The GCC compiler provides a set of options that allow developers to inspect different parts of the compilation process.
 Among these options are some that produce debug dumps from various points in the compilation, print some statistics like memory usage and execution time and list specific information about the compiler configuration (such as where it looks for libraries).
@@ -237,5 +329,14 @@ The structure is analogous to the previously described one with one key differen
 \chapter{Example usage}
 \chapter{Conclusion}
   \section{Possible further development}
+
+\begin{thebibliography}{42}
+  \bibitem{pil4}
+    Roberto Ierusalimschy,
+    \emph{Programming in Lua},
+    Feisty Duck Ltd,
+    4th edition,
+    2016.
+\end{thebibliography}
 
 \end{document}

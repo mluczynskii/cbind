@@ -1,0 +1,14 @@
+{#- wrapper.c.j2
+  
+-#}
+{%- import "macros.c.j2" as macros -%}
+int cbind_{{ function.Name }}(lua_State *L) {
+  {% set returns = (function.Returns.Kind != "void_type") -%}
+  {% if returns %}{{ function.Returns.Typename }} result = {% endif %}{{ function.Name }}(
+  {%- for argument in function.Arguments %}
+    {{ macros.pop(argument, loop.index) }}{% if not loop.last %},{% endif %}
+  {%- endfor %}
+  );
+  {% if returns %}{{ macros.push(function.Returns, "result") }};{% endif %}
+  return {{ 1 if returns else 0 }};
+}

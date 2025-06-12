@@ -1,0 +1,38 @@
+{#- macros.c.j2
+  A collection of useful macros used throughout the various templates.
+-#}
+{% macro typename(struct) -%}
+  {%- if struct.Typedef -%}
+    {{ struct.Typename }}
+  {%- else -%}
+    {{ "struct" ~ struct.Typename }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro pop(argument, index) -%}
+  {%- if argument.Kind == "record_type" -%}
+    {#- TODO: pointers -#}
+    {%- set name = typename(argument) -%}
+    *({{ name }} *)lua_touserdata(L, {{ index }})
+  {%- elif argument.Kind == "character_type" -%}
+    lua_tostring(L, {{ index }})[0]
+  {%- elif argument.Kind == "integer_type" -%}
+    lua_tointeger(L, {{ index }})
+  {%- elif argument.Kind == "real_type" -%}
+    lua_tonumber(L, {{ index }})
+  {%- else -%}
+    /* undefined */
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro push(type, name) -%}
+  {%- if type.Kind == "integer_type" -%}
+    lua_pushinteger(L, {{ name }})
+  {%- elif type.Kind == "character_type" -%}
+    (void)lua_pushlstring(L, &({{ name }}), 1)
+  {%- elif type.Kind == "real_type" -%}
+    lua_pushnumber(L, {{ name }})
+  {%- else -%}
+    /* undefined */
+  {%- endif -%}
+{%- endmacro %}

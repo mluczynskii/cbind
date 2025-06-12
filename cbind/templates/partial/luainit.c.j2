@@ -1,0 +1,21 @@
+{#- luainit.c.j2
+  The init_lua function creates a lua_State used to interact with
+  the Lua interpreter. When initializing, we need to create a table,
+  populate it with API wrappers and submodules for manipulating 
+  user-defined data structures. We then expose it to Lua scripts
+  under the name 'modulename'. 
+
+  submodules - An array of module names for each user-defined data
+    structure.
+-#}
+void *init_lua(const char *modulename) {
+  lua_State *L = luaL_newstate();
+  luaL_openlibs(L);
+  luaL_newlib(L, functions);
+  {%- for module in submodules %}
+  luaopen_{{ module }}(L);
+  lua_setfield(L, -2, "{{ module }}");
+  {%- endfor %}
+  lua_setglobal(L, modulename);
+  return (void *)L;
+}

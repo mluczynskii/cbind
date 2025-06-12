@@ -1,0 +1,14 @@
+{#- constructor.c.j2
+  Creates a default constructor for a user-defined data structure.
+-#}
+{%- import "macros.c.j2" as macros -%}
+{%- set name = macros.typename(struct) -%}
+int cbind_{{ struct.Typename }}_new(lua_State *L) {
+  {{ name }} *target = ({{ name }} *)lua_newuserdata(L, sizeof({{ name }}));
+  {%- for field in struct.Fields %}
+  target->{{ field.Name }} = {{ macros.pop(field, loop.index) }};
+  {%- endfor %}
+  luaL_getmetatable(L, "{{ struct.Typename }}");
+  lua_setmetatable(L, -2);
+  return 1;
+}

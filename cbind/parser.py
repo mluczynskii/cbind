@@ -1,88 +1,134 @@
 import argparse
-import re  
-from json import dumps
+import re
+import json
 
-def traverse(chunk, start, *path): 
-  """Move through the node chunk along the path"""
-  node = start 
-  for fieldname in path: 
-    (s, node) = chunk[node[fieldname]]
+def traverse(chunk, node, *path):
+  """Move through the chunk along the path, starting from node"""
+  if not path:
+    raise ValueError("traverse: Path must be non-empty")
+  for fieldname in path:
+      index = node[fieldname]
+      (s, node) = chunk[index]
   return (s, node)
 
-def find_node(chunk, name): 
-  """Return FIRST node in a chunk with a given name"""
-  return find_nodes(chunk, name)[0]
+def find_node(chunk, name):
+  """Find FIRST node in a chunk with a given name"""
+  nodes = find_nodes(chunk, name)
+  if not nodes:
+    raise ValueError(f"find_node: Node named {name} not found")
+  return nodes[0]
 
-def find_nodes(chunk, name): 
-  """Return EVERY node in a chunk with a given name"""
-  result = [traits for (s, traits) in chunk if s == name]
-  if not result:
-    raise Exception(f"No nodes named {name} found.")
-  return result 
-  
-def function_name(chunk): 
+def find_nodes(chunk, name):
+  """Find EVERY node in a chunk with a given name"""
+  return [traits for (s, traits) in chunk if s == name]
+
+def function_name(chunk):
+  """Get information about the function name"""
   root = find_node(chunk, "function_decl")
   (_, id_node) = traverse(chunk, root, "name")
-  return {"Name": id_node["strg"]}
+  return id_node["strg"]
 
+def return_type(chunk):
+  """Get information about the function return type"""
+  decl_node = find_node(chunk, "function_decl")
+  return extract_type(chunk, traverse(chunk, decl_node, "type", "retn"))
+
+# TODO: review implementation
 def extract_ptr(chunk, type_node):
   """Extracts information about a pointer"""
   (kind, type_decl) = traverse(chunk, type_node, "ptd")
   if kind == "function_type":
-    data = {"Arguments": []}
-    data["Returns"] = extract_type(chunk, *traverse(chunk, type_decl, "retn"))
-    (_, prm) = traverse(chunk, type_decl, "prms")
-    while "chan" in prm:
-      data["Arguments"].append(extract_type(chunk, *traverse(chunk, prm, "valu")))
-      (_, prm) = traverse(chunk, prm, "chan")
+      data = {"Arguments": []}
+      data["Returns"] = extract_type(chunk, *traverse(chunk, type_decl, "retn"))
+      (_, prm) = traverse(chunk, type_decl, "prms")
+      while "chan" in prm:
+          data["Arguments"].append(extract_type(chunk, *traverse(chunk, prm, "valu")))
+          (_, prm) = traverse(chunk, prm, "chan")
   else:
-    data = extract_type(chunk, kind, type_decl)
+      data = extract_type(chunk, kind, type_decl)
   return data
 
-def extract_type(chunk, kind, type_node):
+# TODO: fix typename for non-fptr types
+def extract_type(chunk, type_node):
   """Gather information about the type described by type_node"""
-  result = {"Kind": kind, "Typedef": "unql" in type_node}
-  if kind == "integer_type":
-    (_, sz_node) = traverse(chunk, type_node, "size")
-    if sz_node["int"] == "8":
-      result["Kind"] = "character_type"
+  (kind, traits) = type_node
+  result = {"Kind": kind, "Typedef": "unql" in traits, "Pointer": None}
   if kind == "pointer_type":
-    result["Pointer"] = extract_ptr(chunk, type_node)
-    return result
-  if kind == "record_type" and not result["Typedef"]:
-    (_, type_decl) = traverse(chunk, type_node, "name")
-  else:
-    (_, type_decl) = traverse(chunk, type_node, "name", "name")
+      result["Typename"] = ""
+      result["Pointer"] = extract_ptr(chunk, traits)
+      return result
+  if kind == "integer_type":
+      (_, size_node) = traverse(chunk, traits, "size")
+      if size_node["int"] == "8":
+          result["Kind"] = "character_type"
+  path = ["name"] if kind == "record_type" and not result["Typedef"] else ["name", "name"]
+  (_, type_decl) = traverse(chunk, traits, *path)
   result["Typename"] = type_decl["strg"]
   return result
 
-def return_type(chunk): 
-  """Return information about the function return type"""
-  root = find_node(chunk, "function_decl")
-  (kind, type_node) = traverse(chunk, root, "type", "retn")
-  return extract_type(chunk, kind, type_node)
-
-def argument_names(chunk):
-  """Generate variable names for the function arguments"""
-  argcount = len(find_nodes(chunk, "parm_decl")) 
-  return [{"Name": f"var{idx}"} for idx in range(1, argcount+1)]
-
-def argument_types(chunk): 
-  """Iterate over tree_nodes to get function argument types in correct order"""
-  result = []
-  (_, prm) = traverse(chunk, find_node(chunk, "function_decl"), "type", "prms") 
-  while "chan" in prm:
-    result.append(extract_type(chunk, *traverse(chunk, prm, "valu")))
-    (_, prm) = traverse(chunk, prm, "chan")
-  return result
-
-def function_arguments(chunk): 
-  """Combine argument_names with argument_types"""
-  names = argument_names(chunk)
-  types = argument_types(chunk) 
+def function_arguments(chunk):
+  """Gather information about the function arguments"""
+  def argument_types():
+    decl_node = find_node(chunk, "function_decl")
+    result = []
+    (_, prm) = traverse(chunk, decl_node, "type", "prms")
+    while "chan" in prm:
+        result.append(extract_type(chunk, traverse(chunk, prm, "valu")))
+        (_, prm) = traverse(chunk, prm, "chan")
+    return result
+  parm_nodes = find_nodes(chunk, "parm_decl")
+  names = [{"Name": f"var{idx}"} for idx in range(1, len(parm_nodes) + 1)]
+  types = argument_types()
   return [{**name, **type_} for name, type_ in zip(names, types, strict=True)]
 
-def mk_node(line): 
+def find_structs(chunk):
+  """Get info about every struct used in a function"""
+  def find_owner(field_decl):
+    """For a given field declaration, get typename of the corresponding record"""
+    (_, record) = traverse(chunk, field_decl, "scpe")
+    index = field_decl["scpe"]
+    typedef = not "name" in record
+    if typedef:
+        candidates = find_nodes(chunk, "record_type")
+        for candidate in candidates:
+            if not "unql" in candidate or candidate["unql"] != index:
+                continue
+            else:
+                record = candidate
+                break
+    path = ["name", "name"] if typedef else ["name"]
+    (_, id_node) = traverse(chunk, record, *path)
+    return id_node["strg"], typedef
+  
+  def convert_structs(structs: dict[str, dict], typedefs: dict[str, bool]):
+    """Modify the structure of the result of extract_structs"""
+    result = []
+    for typename, fields in structs.items():
+      converted = {
+        "Typename": typename, 
+        "Fields": fields,
+        "Typedef": typedefs[typename]
+      }
+      result.append(converted)
+    return result
+  
+  fields = find_nodes(chunk, "field_decl")
+  result, typedefs = {}, {}
+  if not fields:
+    return result
+  for field in fields:
+    owner, typedef = find_owner(field)
+    name = traverse(chunk, field, "name")[1]["strg"]
+    type_ = extract_type(chunk, traverse(chunk, field, "type"))
+    info = {"Name": name, **type_}
+    if owner not in result:
+      result[owner] = [info]
+    else:
+      result[owner].append(info)
+    typedefs[owner] = typedef 
+  return convert_structs(result, typedefs)
+
+def mk_node(line):
   """Convert a single AST line into a pair (node_name, node_parameters)"""
   if match := re.fullmatch(r"^@\d+ (?P<name>\w+) (?P<params>.*)$", line):
     traits = {}
@@ -93,9 +139,9 @@ def mk_node(line):
         traits[arg] = val
     return (match.group("name"), traits)
   else:
-    raise Exception(f"mk_node: could not process line '{line}'")
+    raise ValueError(f"mk_node: Could not process line '{line}'")
 
-def chunks(lines): 
+def chunks(lines):
   """Splits the whole AST file into per-function chunks"""
   chunk = []
   for line in lines[2:]:
@@ -105,37 +151,61 @@ def chunks(lines):
       chunk = []
     else:
       node = mk_node(line)
-      chunk.append(node) 
+      chunk.append(node)
   yield chunk
 
-def coalesce(lines): 
+def coalesce(lines):
   """Adjusts the AST so that every node description takes up one line"""
   result, acc = [], ""
   for line in lines:
     if re.match(r"^(?:@)|(?:;;).+$", line):
       if acc:
         result.append(acc)
-      acc = line 
+      acc = line
     else:
       acc = f"{acc} {line}"
   result.append(acc)
   return result
 
 def main():
-  parser = argparse.ArgumentParser(description="GCC AST parser")
-  parser.add_argument("file", type=argparse.FileType("r"), nargs="+", help=".original AST files generated using -fdump-tree-original-raw")
-  parser.add_argument("-f", "--filter", help="text file containing desired function names")
+  parser = argparse.ArgumentParser(
+    prog="parser.py",
+    description="GCC AST parser converting .original files into a JSON representation"
+  )
+  parser.add_argument(
+    "infile",
+    type=argparse.FileType("r"),
+    nargs="+",
+    help="AST files generated using -fdump-tree-original-raw"
+  )
+  parser.add_argument(
+    "-o", "--output",
+    type=argparse.FileType("w"),
+    help="Output .json file (defaults to dump.json)"
+  )
   args = parser.parse_args()
-  functions = []
-  for file in args.file:
+  outfile = args.output or open("dump.json", "w")
+  for file in args.infile:
     lines = [" ".join(line.split()) for line in file if not re.match(r"^\s+$", line)]
     lines = coalesce(lines)
-    for chunk in chunks(lines):
-      result = {**function_name(chunk), "Returns": return_type(chunk)}
-      result["Arguments"] = function_arguments(chunk)
-      functions.append(result)
-  with open("dump.json", "w") as output:
-    output.write(dumps(functions, indent=2))
+    output = {"Functions": [], "Structs": []}
+    for chunk in chunks(lines): # First pass: collect information about API functions
+      name = function_name(chunk)
+      ret_type = return_type(chunk)
+      args = function_arguments(chunk)
+      function = {
+         "Name": name,
+         "Returns": ret_type,
+         "Arguments": args 
+      }
+      output["Functions"].append(function)
+    for chunk in chunks(lines): # Second pass: collect information about structs
+      structs = find_structs(chunk)
+      if not structs:
+        continue
+      output["Structs"] = output["Structs"] + structs
+  outfile.write(json.dumps(output, indent=2))
+  outfile.close()
 
 if __name__ == "__main__":
   main()

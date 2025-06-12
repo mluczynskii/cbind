@@ -1,0 +1,50 @@
+{#- source.c.j2
+  Main binding code. Puts every wrapper together, every structure
+  utilities, and the interface functions (exec_script and close_lua).
+-#}
+#include <lua.h>
+#include <lualib.h> 
+#include <lauxlib.h>
+#include <callback.h> 
+#include <stdlib.h>
+#include <stdio.h>
+#include "api.h"
+
+#ifndef NULL
+#define NULL 0
+#endif
+
+int exec_script(void *state, const char *filename) {
+  lua_State *L = (lua_State *)state;
+  int status = luaL_dofile(L, filename);
+  if (status != 0)
+    fprintf(stderr, "%s\n", lua_tostring(L, -1));
+  return status;
+}
+
+void close_lua(void* state) {
+  lua_State *L = (lua_State *)state; 
+  lua_close(L);
+}
+
+{% for function in functions %}
+{% include "partial/wrapper.c.j2" %}
+{% endfor %}
+
+{%- for struct in structs %}
+{% include "structs/constructor.c.j2" %}
+{%- for field in struct.Fields %}
+{% include "structs/getter.c.j2" %}
+{% include "structs/setter.c.j2" %}
+{% endfor %}
+{% endfor %}
+
+{%- for register in registers %}
+{% include "partial/luareg.c.j2" %}
+{% endfor %}
+
+{%- for submodule in submodules %}
+{% include "partial/luaopen.c.j2" %}
+{% endfor %}
+
+{% include "partial/luainit.c.j2" %}

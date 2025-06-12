@@ -1,4 +1,3 @@
-lua*
 *.original
 *.json
 /tmp

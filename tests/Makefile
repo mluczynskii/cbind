@@ -10,6 +10,8 @@ OBJ = api.o binding.o main.o
 
 CFLAGS=-I$(IDIR) -I/usr/local/include -L/usr/local/lib
 
+all: main
+
 api.c.original: $(SDIR)/api.c
 	gcc -c -fdump-tree-original-raw=api.c.original $(SDIR)/api.c $(CFLAGS)
 

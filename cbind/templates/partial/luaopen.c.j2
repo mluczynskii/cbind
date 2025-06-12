@@ -1,0 +1,17 @@
+{#- luaopen.c.j2
+  For each user-defined data structure, we want to initialize
+  their metatable and register setters/getters, and a default
+  constructor. The created table needs to be attached to the 
+  main module created in luainit.c.j2.
+
+  submodule - Name of the relevant structure.
+-#}
+int luaopen_{{ submodule }}(lua_State *L) {
+  luaL_newmetatable(L, "{{ submodule }}");
+  lua_pushvalue(L, -1);
+  lua_setfield(L, -2, "__index");
+  luaL_setfuncs(L, {{ submodule }}lib_m, 0);
+  lua_pop(L, 1);
+  luaL_newlib(L, {{ submodule }}_f);
+  return 1;
+}

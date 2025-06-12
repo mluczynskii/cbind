@@ -1,5 +1,5 @@
 #!/bin/bash
-make main 2>/dev/null 1>/dev/null
+make 2>/dev/null 1>/dev/null
 
 PASSED=0
 TOTAL=0

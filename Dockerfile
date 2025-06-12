@@ -18,4 +18,10 @@ RUN git clone https://github.com/mluczynskii/cbind.git /workspace/cbind
 
 WORKDIR /workspace/cbind
 
+RUN python -m venv .venv 
+
+RUN source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt 
+
+ENV PATH="/workspace/cbind/.venv/bin:$PATH"
+
 CMD [ "bash" ]

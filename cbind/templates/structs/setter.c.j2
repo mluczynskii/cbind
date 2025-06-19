@@ -10,6 +10,6 @@
 {%- set name = macros.typename(struct) -%}
 static int cbind_{{ struct.Typename }}_set_{{ field.Name }}(lua_State *L) {
   {{ name }} *target = ({{ name }} *)lua_touserdata(L, 1);
-  target->{{ field.Name }} = {{ macros.pop(field, 2) }};
+  {{ macros.pop(field, 2, "target->" ~ field.Name) }};
   return 0;
 }

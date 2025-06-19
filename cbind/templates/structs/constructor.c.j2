@@ -6,7 +6,7 @@
 int cbind_{{ struct.Typename }}_new(lua_State *L) {
   {{ name }} *target = ({{ name }} *)lua_newuserdata(L, sizeof({{ name }}));
   {%- for field in struct.Fields %}
-  target->{{ field.Name }} = {{ macros.pop(field, loop.index) }};
+  {{ macros.pop(field, loop.index, "target->" ~ field.Name) }};
   {%- endfor %}
   luaL_getmetatable(L, "{{ struct.Typename }}");
   lua_setmetatable(L, -2);

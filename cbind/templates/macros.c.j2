@@ -9,20 +9,22 @@
   {%- endif -%}
 {%- endmacro %}
 
-{% macro pop(argument, index) -%}
+{% macro pop(argument, index, var) -%}
   {%- if argument.Kind == "record_type" -%}
-    {#- TODO: pointers -#}
     {%- set name = typename(argument) -%}
-    *({{ name }} *)lua_touserdata(L, {{ index }})
+    SAFE_FETCH_USERDATA(L, {{ index }}, {{ var }}, {{ name }})
   {%- elif argument.Kind == "character_type" -%}
-    lua_tostring(L, {{ index }})[0]
+    SAFE_FETCH_CHARACTER(L, {{ index }}, {{ var }})
   {%- elif argument.Kind == "integer_type" -%}
-    lua_tointeger(L, {{ index }})
+    SAFE_FETCH_INTEGER(L, {{ index }}, {{ var }})
   {%- elif argument.Kind == "real_type" -%}
-    lua_tonumber(L, {{ index }})
+    SAFE_FETCH_NUMBER(L, {{ index }}, {{ var }})
   {%- else -%}
     /* undefined */
   {%- endif -%}
+{%- endmacro %}
+
+{% macro pass(argument, index) -%}
 {%- endmacro %}
 
 {% macro push(type, name) -%}

@@ -14,6 +14,8 @@
 #define NULL 0
 #endif
 
+{% include "defines.c.j2" %}
+
 int exec_script(void *state, const char *filename) {
   lua_State *L = (lua_State *)state;
   int status = luaL_dofile(L, filename);

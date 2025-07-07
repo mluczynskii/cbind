@@ -11,19 +11,18 @@ struct container {
 
 typedef int number_t;
 
-/* suite #1 - simple types */
 int increment(int n);
 char foo(number_t k, char c);
 double simple_num(short a, int b, long c, float d);
 double invert_sqrt(double x);
 
-/* suite #2 - composite types */
 int sum(pair_t pair);
-//char unpack(struct container cont);
-//struct container pack(char character);
 
-//int call(int (*fptr)(int, int));
-//int compose(int (*f)(int), int (*g)(int, int), int x);
-//void modify(long *ptr);
+typedef char (*function_t)(int, char);
+
+char call(char (*f)(int, char), int x, char c);
+char call_typedef(function_t f, int x, char c);
+
+int call_2(int (*f)(int), int n);
 
 #endif

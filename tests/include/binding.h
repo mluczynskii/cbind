@@ -2,7 +2,8 @@
 #define BINDING
 
 typedef struct {
-  
+  void *L;
+  int key;
 } closure_t;
 
 void * init_lua(const char *module);

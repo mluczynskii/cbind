@@ -1,18 +1,15 @@
-{#- wrapper.c.j2
-  
--#}
+{#- wrapper.c.j2 -#}
 {%- import "macros.c.j2" as macros -%}
-int cbind_{{ function.Name }}(lua_State *L) {
-  {% set returns = (function.Returns.Kind != "void_type") -%}
-  {%- for argument in function.Arguments %}
-  {{ argument.Typename }} {{ "arg" ~ loop.index }};
-  {{ macros.pop(argument, loop.index, "arg" ~ loop.index) }}
+{%- set returns = (function["Returns"]["Kind"] != "void_type") -%}
+int cbind_{{ function["Name"] }}(lua_State *L) {
+  {%- for argument in function["Arguments"] %}
+  {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, argument) | indent(2) }}
   {%- endfor %}
-  {% if returns %}{{ function.Returns.Typename }} result = {% endif %}{{ function.Name }}(
+  {% if returns %}{{ function["Returns"]["Typename"] }} result = {% endif %}{{ function["Name"] }}(
   {%- for argument in function.Arguments %}
-    {{ "arg" ~ loop.index }}{% if not loop.last %},{% endif %}
+    {{ macros.pass("arg" ~ loop.index, argument) | indent(4) }}{% if not loop.last %},{% endif %}
   {%- endfor %}
   );
-  {% if returns %}{{ macros.push(function.Returns, "result") }};{% endif %}
+  {% if returns %}{{ macros.push("L", "result", function["Returns"]) }}{% endif %}
   return {{ 1 if returns else 0 }};
 }

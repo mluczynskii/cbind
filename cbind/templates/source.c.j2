@@ -9,12 +9,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "api.h"
+#include "binding.h"
 
 #ifndef NULL
 #define NULL 0
 #endif
-
-{% include "defines.c.j2" %}
 
 int exec_script(void *state, const char *filename) {
   lua_State *L = (lua_State *)state;
@@ -28,6 +27,10 @@ void close_lua(void* state) {
   lua_State *L = (lua_State *)state; 
   lua_close(L);
 }
+
+{% for callback in callbacks %}
+{% include "callbacks/callback.c.j2" %}
+{% endfor %}
 
 {% for function in functions %}
 {% include "partial/wrapper.c.j2" %}

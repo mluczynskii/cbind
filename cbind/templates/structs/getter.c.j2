@@ -1,16 +1,7 @@
-{#- getter.c.j2
-  Creates a getter for a user-defined data structure.
-
-  name - Name of the type that we are creating a getter for,
-  field - Name of the field of a structure,
-  character - Whether or not a field is of type 'char',
-  pop - lua_push* function corresponding to a given field type 
-    or NULL if character=true.
--#}
+{#- getter.c.j2 - Creates a getter for a user-defined data structure. -#}
 {%- import "macros.c.j2" as macros -%}
-{%- set name = macros.typename(struct) -%}
-static int cbind_{{ struct.Typename }}_get_{{ field.Name }}(lua_State *L) {
-  {{ name }} *target = ({{ name }} *)lua_touserdata(L, 1);
-  {{ macros.push(field, "target->" ~ field.Name) }};
+static int cbind_{{ struct["Typename"] }}_get_{{ field["Name"] }}(lua_State *L) {
+  {{ struct["Typename"] }} *target = ({{ struct["Typename"] }} *)lua_touserdata(L, 1);
+  {{ macros.push("L", "target->" ~ field["Name"], field) }};
   return 1;
 }

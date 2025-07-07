@@ -1,15 +1,8 @@
-{#- setter.c.j2
-  Creates a setter for a user-defined data structure.
-
-  name - Name of the type that we are creating a setter for,
-  field - Name of the field of a structure,
-  character - Whether or not a field is of type 'char',
-  pop - lua_to* function corresponding to a given field type or NULL if character=true.
--#}
+{#- setter.c.j2 - Creates a setter for a user-defined data structure. -#}
 {%- import "macros.c.j2" as macros -%}
-{%- set name = macros.typename(struct) -%}
-static int cbind_{{ struct.Typename }}_set_{{ field.Name }}(lua_State *L) {
-  {{ name }} *target = ({{ name }} *)lua_touserdata(L, 1);
-  {{ macros.pop(field, 2, "target->" ~ field.Name) }};
+static int cbind_{{ struct["Typename"] }}_set_{{ field["Name"] }}(lua_State *L) {
+  {{ struct["Typename"] }} *target = ({{ struct["Typename"] }} *)lua_touserdata(L, 1);
+  {{ macros.safe_fetch("L", 2, "new_value", field) | indent(2) }}
+  target->{{ field["Name"] }} = new_value;
   return 0;
 }

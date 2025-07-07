@@ -1,7 +1,7 @@
 IDIR=./include
 SDIR=./src
 
-LIBS=-lm -llua
+LIBS=-lm -llua -lffcall
 
 _DEPS = api.h binding.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))

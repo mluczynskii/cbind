@@ -14,9 +14,13 @@ env = Environment(
 def apply_template(name, context):
   """
   Renders a Jinja2 template with the given name using the provided context.
-  :param name: Name of the template file (e.g., structs/getter.c.j2).
-  :param context: Dictionary of values passed to the template.
-  :return: Rendered template as a string.
+
+  Args:
+    name: Name of the template file (e.g., structs/getter.c.j2).
+    context: Dictionary of values passed to the template.
+
+  Returns
+    template: Rendered template as a string.
   """
   template = env.get_template(name)
   return template.render(context)
@@ -24,8 +28,12 @@ def apply_template(name, context):
 def load_ast(infile):
   """
   Loads the AST description .json file into a python dictionary.
-  :param infile: Handle for the .json file.
-  :return: .json file as a python dictionary
+
+  Args:
+    infile: Handle for the .json file.
+  
+  Returns
+    ast: .json file as a python dictionary
   """
   try:
     ast = json.load(infile)
@@ -59,17 +67,64 @@ def create_register_context(ast):
     ])
   return registers
 
+def attach_callback_name(ast):
+  """
+  Adds the generated callback name to each function pointer description inside the AST dump.
+
+  Args:
+    ast: The .json dump as a python directory
+  """
+  def callback_name(data):
+    returns = data["Returns"]["Typename"][0]
+    args = [arg["Typename"][0] for arg in data["Arguments"]]
+    return f"{''.join(args)}_{returns}"
+
+  for function in ast["Functions"]:
+    for argument in function["Arguments"]:
+      if argument["Kind"] == "pointer_type" and argument["Pointer"]["Kind"] == "function_type":
+        name = callback_name(argument["Pointer"])
+        argument["Pointer"]["Template"] = name 
+
+def needed_callbacks(ast):
+  """
+  Creates a list of function pointer descriptions that need their helper functions.
+
+  Args:
+    ast: The .json dump as a python directory
+  
+  Raises:
+    ValueError: The ast hasn't been passed through attach_callback_name first.
+  
+  Returns:
+    result: A list of function pointer descriptions
+  """
+  result = {}
+  for function in ast["Functions"]:
+    for argument in function["Arguments"]:
+      if argument["Kind"] == "pointer_type" and argument["Pointer"]["Kind"] == "function_type":
+        if not argument["Pointer"]["Template"]:
+          raise ValueError("Need to call attach_callback_name(ast) first")
+        name = argument["Pointer"]["Template"]
+        result[name] = argument["Pointer"]
+  return list(result.values())
+
 def create_context(ast):
   """
-  Creates a context passed to the source.c.j2 template
-  :param ast: The .json dump as a python directory
-  :return: The context directory.
+  Creates a context passed to the source.c.j2 template.
+
+  Args:
+    ast: The .json dump as a python directory.
+
+  Returns
+    context: The context directory passed to the main jinja template.
   """
+  attach_callback_name(ast)
   context = {
     "functions": ast["Functions"],
     "registers": create_register_context(ast),
     "submodules": [struct["Typename"] for struct in ast["Structs"]],
-    "structs": ast["Structs"]
+    "structs": ast["Structs"],
+    "callbacks": needed_callbacks(ast)
   }
   return context
 

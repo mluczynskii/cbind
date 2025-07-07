@@ -2,13 +2,13 @@
   Creates a default constructor for a user-defined data structure.
 -#}
 {%- import "macros.c.j2" as macros -%}
-{%- set name = macros.typename(struct) -%}
-int cbind_{{ struct.Typename }}_new(lua_State *L) {
-  {{ name }} *target = ({{ name }} *)lua_newuserdata(L, sizeof({{ name }}));
-  {%- for field in struct.Fields %}
-  {{ macros.pop(field, loop.index, "target->" ~ field.Name) }};
+int cbind_{{ struct["Typename"] }}_new(lua_State *L) {
+  {{ struct["Typename"] }} *target = ({{ struct["Typename"] }} *)lua_newuserdata(L, sizeof({{ struct["Typename"] }}));
+  {%- for field in struct["Fields"] %}
+  {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, field) | indent(2) }}
+  target->{{ field["Name"] }} = {{ "arg" ~ loop.index }};
   {%- endfor %}
-  luaL_getmetatable(L, "{{ struct.Typename }}");
+  luaL_getmetatable(L, "{{ struct["Typename"] }}");
   lua_setmetatable(L, -2);
   return 1;
 }

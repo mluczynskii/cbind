@@ -3,7 +3,20 @@ import re
 import json
 
 def traverse(chunk, node, *path):
-  """Move through the chunk along the path, starting from node"""
+  """
+  Moves through the chunk along the path, starting from node.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+    node: Starting node.
+    *path: Names of the consecutive fields on the path.
+  
+  Raises:
+    ValueError: Provided path is empty.
+
+  Returns:
+    (name, node): A pair consisting of the final node name and the node itself.
+  """
   if not path:
     raise ValueError("traverse: Path must be non-empty")
   for fieldname in path:
@@ -11,51 +24,120 @@ def traverse(chunk, node, *path):
       (s, node) = chunk[index]
   return (s, node)
 
-def find_node(chunk, name):
-  """Find FIRST node in a chunk with a given name"""
+def find_node(chunk, name: str):
+  """
+  Find FIRST node in a chunk with a given name.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+    name (str): Name of a requested node. 
+  
+  Raises:
+    ValueError: A node of a given `name` is nowhere to be found.
+
+  Returns:
+    node: A node with a given `name`.
+  """
   nodes = find_nodes(chunk, name)
   if not nodes:
     raise ValueError(f"find_node: Node named {name} not found")
   return nodes[0]
 
 def find_nodes(chunk, name):
-  """Find EVERY node in a chunk with a given name"""
+  """
+  Find EVERY node in a chunk with a given name.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+    name: Name of the requested nodes.
+  
+  Returns:
+    nodes: A list of nodes with a given `name` (can be empty)
+  """
   return [traits for (s, traits) in chunk if s == name]
 
 def function_name(chunk):
-  """Get information about the function name"""
+  """
+  Finds the name of the function described by a chunk.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+
+  Returns:
+    name: Name of the currently processed function. 
+  """
   root = find_node(chunk, "function_decl")
   (_, id_node) = traverse(chunk, root, "name")
   return id_node["strg"]
 
 def return_type(chunk):
-  """Get information about the function return type"""
+  """
+  Extracts function return type information in the provided chunk.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+  
+  Returns:
+    info: A dictionary better described by the `extract_type` function.
+  """
   decl_node = find_node(chunk, "function_decl")
   return extract_type(chunk, traverse(chunk, decl_node, "type", "retn"))
 
-# TODO: review implementation
 def extract_ptr(chunk, type_node):
-  """Extracts information about a pointer"""
+  """
+  Extracts information about a pointer.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+    type_node: Root node for the type declaration (ex. *function_type*).
+
+  Returns:
+    (data, typename): A dictionary describing the underlying type (same as `extract_type`)
+      and a full typename of the pointer.   
+  """
+  def fptr_typename(data):
+    if "unql" in type_node: 
+      (_, id_node) = traverse(chunk, type_node, "name", "name")
+      return id_node["strg"]
+    arglist = ",".join([
+      arg["Typename"] for arg in data["Arguments"]
+    ])
+    returns = data["Returns"]["Typename"]
+    return f"{returns} (*)({arglist})"
+  
   (kind, type_decl) = traverse(chunk, type_node, "ptd")
   if kind == "function_type":
-      data = {"Arguments": []}
-      data["Returns"] = extract_type(chunk, *traverse(chunk, type_decl, "retn"))
+      data = {"Arguments": [], "Kind": kind}
+      data["Returns"] = extract_type(chunk, traverse(chunk, type_decl, "retn"))
       (_, prm) = traverse(chunk, type_decl, "prms")
       while "chan" in prm:
-          data["Arguments"].append(extract_type(chunk, *traverse(chunk, prm, "valu")))
+          data["Arguments"].append(extract_type(chunk, traverse(chunk, prm, "valu")))
           (_, prm) = traverse(chunk, prm, "chan")
+      typename = fptr_typename(data)
   else:
       data = extract_type(chunk, kind, type_decl)
-  return data
+      typename = f"{data["Typename"]}*"
+  return data, typename
 
-# TODO: fix typename for non-fptr types
 def extract_type(chunk, type_node):
-  """Gather information about the type described by type_node"""
+  """
+  Gather information about the type described by type_node.
+
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+    type_node: Root node for the type declaration (ex. *integer_type*).
+
+  Returns:
+    dict: A dictionary describing the type
+        - Kind (str): The type family to which the type belongs (ex. void_type or character_type),
+        - Typedef (bool): Whether the type is declared using a typedef (used in structs),
+        - Pointer: Underlying type information (if the type is a pointer) or None,
+        - Typename (str): The name of the type (ex. *int* or *pair_t*)
+  """
   (kind, traits) = type_node
   result = {"Kind": kind, "Typedef": "unql" in traits, "Pointer": None}
   if kind == "pointer_type":
-      result["Typename"] = ""
-      result["Pointer"] = extract_ptr(chunk, traits)
+      result["Pointer"], result["Typename"] = extract_ptr(chunk, traits)
       return result
   if kind == "integer_type":
       (_, size_node) = traverse(chunk, traits, "size")
@@ -67,19 +149,22 @@ def extract_type(chunk, type_node):
   return result
 
 def function_arguments(chunk):
-  """Gather information about the function arguments"""
-  def argument_types():
-    decl_node = find_node(chunk, "function_decl")
-    result = []
-    (_, prm) = traverse(chunk, decl_node, "type", "prms")
-    while "chan" in prm:
-        result.append(extract_type(chunk, traverse(chunk, prm, "valu")))
-        (_, prm) = traverse(chunk, prm, "chan")
-    return result
-  parm_nodes = find_nodes(chunk, "parm_decl")
-  names = [{"Name": f"var{idx}"} for idx in range(1, len(parm_nodes) + 1)]
-  types = argument_types()
-  return [{**name, **type_} for name, type_ in zip(names, types, strict=True)]
+  """
+  Gather information about the function arguments
+  
+  Args:
+    chunk: A list of nodes relevant to the currently processed function.
+  
+  Returns:
+    xs: A list of dictionaries dictated by the `extract_type` function.
+  """
+  decl_node = find_node(chunk, "function_decl")
+  xs = []
+  (_, prm) = traverse(chunk, decl_node, "type", "prms")
+  while "chan" in prm:
+      xs.append(extract_type(chunk, traverse(chunk, prm, "valu")))
+      (_, prm) = traverse(chunk, prm, "chan")
+  return xs
 
 def find_structs(chunk):
   """Get info about every struct used in a function"""
@@ -129,7 +214,18 @@ def find_structs(chunk):
   return convert_structs(result, typedefs)
 
 def mk_node(line):
-  """Convert a single AST line into a pair (node_name, node_parameters)"""
+  """
+  Converts a single AST line into a pair (node_name, node_parameters)
+  
+  Args:
+    line: Single line corresponding to one full (!) node description.
+
+  Raises:
+    ValueError: Provided line does not match the format of the GCC AST node.
+
+  Returns:
+    (name, node): The name of the node and it's parameters
+  """
   if match := re.fullmatch(r"^@\d+ (?P<name>\w+) (?P<params>.*)$", line):
     traits = {}
     for arg, val in re.findall(r"([a-z]+) ?: ([^\s]+)", match.group("params")):
@@ -142,7 +238,15 @@ def mk_node(line):
     raise ValueError(f"mk_node: Could not process line '{line}'")
 
 def chunks(lines):
-  """Splits the whole AST file into per-function chunks"""
+  """
+  Splits the whole AST file into per-function chunks.
+
+  Args:
+    lines: Every line of the AST dump as a list.
+
+  Returns:
+    chunks: List of lists of nodes making up specific chunks.
+  """
   chunk = []
   for line in lines[2:]:
     if re.fullmatch(r"^;;.*$", line):
@@ -155,7 +259,12 @@ def chunks(lines):
   yield chunk
 
 def coalesce(lines):
-  """Adjusts the AST so that every node description takes up one line"""
+  """
+  Adjusts the AST so that every node description takes up one line.
+  
+  Args:
+    lines: Every line of the AST dump as a list.
+  """
   result, acc = [], ""
   for line in lines:
     if re.match(r"^(?:@)|(?:;;).+$", line):

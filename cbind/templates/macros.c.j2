@@ -1,40 +1,100 @@
-{#- macros.c.j2
-  A collection of useful macros used throughout the various templates.
--#}
-{% macro typename(struct) -%}
-  {%- if struct.Typedef -%}
-    {{ struct.Typename }}
-  {%- else -%}
-    {{ "struct" ~ struct.Typename }}
-  {%- endif -%}
+{#- macros.c.j2 - A collection of useful macros used throughout the various templates. -#}
+
+{# Pops a value from the stack WITHOUT invalid type checks #}
+{% macro unsafe_fetch(state, stack_idx, variable_name, type) -%}
+{#-     -#}
+{% if type["Kind"] == "record_type" or (type["Kind"] == "pointer_type" and type["Pointer"]["Kind"] == "record_type") -%}
+{{ type["Typename"] ~ " *" ~ variable_name }} = ({{ type["Typename"] }} *)lua_touserdata({{ state }}, {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "character_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }} = lua_tostring({{ state }}, {{ stack_idx }})[0];
+{#-     -#}
+{%- elif type["Kind"] == "integer_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }} = lua_tointeger({{ state }}, {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "real_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }} = lua_tonumber({{ state }}, {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "pointer_type" and type["Pointer"]["Kind"] == "function_type" -%}
+lua_pushvalue({{ state }}, {{ stack_idx }});
+closure_t *data_{{ stack_idx }} = (closure_t *)malloc(sizeof(closure_t));
+data_{{ stack_idx }}->L = (void *){{ state }};
+data_{{ stack_idx }}->key = luaL_ref({{ state }}, LUA_REGISTRYINDEX);
+void *{{ variable_name }} = alloc_callback({{ type["Pointer"]["Template"] }}, (void *)data_{{ stack_idx }});
+{#-     -#}
+{%- else -%}
+#error "Unhandled variable type"
+{%- endif %}
+{#-     -#}
 {%- endmacro %}
 
-{% macro pop(argument, index, var) -%}
-  {%- if argument.Kind == "record_type" -%}
-    {%- set name = typename(argument) -%}
-    SAFE_FETCH_USERDATA(L, {{ index }}, {{ var }}, {{ name }})
-  {%- elif argument.Kind == "character_type" -%}
-    SAFE_FETCH_CHARACTER(L, {{ index }}, {{ var }})
-  {%- elif argument.Kind == "integer_type" -%}
-    SAFE_FETCH_INTEGER(L, {{ index }}, {{ var }})
-  {%- elif argument.Kind == "real_type" -%}
-    SAFE_FETCH_NUMBER(L, {{ index }}, {{ var }})
-  {%- else -%}
-    /* undefined */
-  {%- endif -%}
+{# Pops a value from the stack WITH invalid type checks #}
+{% macro safe_fetch(state, stack_idx, variable_name, type) -%}
+{#-     -#}
+{% if type["Kind"] == "record_type" -%}
+{{ type["Typename"] ~ " *" ~ variable_name }} = ({{ type["Typename"] }} *)luaL_checkudata({{ state }}, {{ stack_idx }}, "{{ type["Typename"] }}"); 
+{#-     -#}
+{%- elif type["Kind"] == "character_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }};
+if (lua_isstring({{ state }}, {{ stack_idx }}))
+  {{ variable_name }} = lua_tostring({{ state }}, {{ stack_idx }})[0];
+else 
+  return luaL_error({{ state }}, "Expected character at position %d", {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "integer_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }};
+if (lua_isinteger({{ state }}, {{ stack_idx }}))
+  {{ variable_name }} = lua_tointeger({{ state }}, {{ stack_idx }});
+else 
+  return luaL_error({{ state }}, "Expected integer at position %d", {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "real_type" -%}
+{{ type["Typename"] ~ " " ~ variable_name }};
+if (lua_isnumber({{ state }}, {{ stack_idx }}))
+{{ variable_name }} = lua_tonumber({{ state }}, {{ stack_idx }});
+else 
+  return luaL_error({{ state }}, "Expected real number at position %d", {{ stack_idx }});
+{#-     -#}
+{%- elif type["Kind"] == "pointer_type" and type["Pointer"]["Kind"] == "function_type" -%}
+if (!lua_isfunction({{ state }}, {{ stack_idx }}))
+  return luaL_error({{ state }}, "Expected a function at position %d", {{ stack_idx }});
+{{ unsafe_fetch(state, stack_idx, variable_name, type) }}
+{#-     -#}
+{%- else -%}
+#error "Unhandled variable type"
+{%- endif %}
+{#-     -#}
 {%- endmacro %}
 
-{% macro pass(argument, index) -%}
+{# Pass a variable to the API call #}
+{% macro pass(variable_name, type) -%}
+{#-     -#}
+{% if type["Kind"] == "record_type" -%}
+*{{ variable_name }}
+{#-     -#}
+{%- elif type["Kind"] == "pointer_type" and type["Pointer"]["Kind"] == "function_type" -%}
+({{ type["Typename"] }}){{ variable_name }}
+{#-     -#}
+{%- else -%}
+{{ variable_name }}
+{%- endif %}
+{#-     -#}
 {%- endmacro %}
 
-{% macro push(type, name) -%}
-  {%- if type.Kind == "integer_type" -%}
-    lua_pushinteger(L, {{ name }})
-  {%- elif type.Kind == "character_type" -%}
-    (void)lua_pushlstring(L, &({{ name }}), 1)
-  {%- elif type.Kind == "real_type" -%}
-    lua_pushnumber(L, {{ name }})
-  {%- else -%}
-    /* undefined */
-  {%- endif -%}
+{# Push a value onto the stack #}
+{% macro push(state, variable_name, type) -%}
+{#-     -#}
+{% if type["Kind"] == "integer_type" -%}
+lua_pushinteger({{ state }}, {{ variable_name }});
+{#-     -#}
+{%- elif type["Kind"] == "character_type" -%}
+(void)lua_pushlstring({{ state }}, &({{ variable_name }}), 1);
+{#-     -#}
+{%- elif type["Kind"] == "real_type" -%}
+lua_pushnumber({{ state }}, {{ variable_name }});
+{#-     -#}
+{%- else -%}
+#error "Unhandled variable type"
+{%- endif -%}
+{#-     -#}
 {%- endmacro %}

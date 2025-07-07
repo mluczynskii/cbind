@@ -1,5 +1,4 @@
 #include "../include/api.h"
-#include <stdio.h>
 
 int increment(int n) { return n + 1; }
 char foo(number_t k, char c) { return c + k; }
@@ -9,5 +8,8 @@ double invert_sqrt(double x) {
 }
 
 int sum(pair_t pair) { return pair.second + pair.first; }
-//char unpack(struct container cont) { return cont.character; }
-//struct container pack(char character) { return (struct container){character}; }
+
+char call(char (*f)(int, char), int x, char c) { return (*f)(x, c); }
+char call_typedef(function_t f, int x, char c) { return (*f)(x, c); }
+
+int call_2(int (*f)(int), int n) { return (*f)(n); }

@@ -42,7 +42,7 @@ def load_ast(infile):
     print(f"Invalid JSON: {ex}", file=sys.stderr)
     sys.exit(1)
 
-def create_register_context(ast):
+def create_register_context(ast, structs):
   """
   """
   def utility_names(typename, fieldname, getter=True):
@@ -53,7 +53,7 @@ def create_register_context(ast):
     name = function["Name"]
     api.append({"lua_name": name, "c_name": f"cbind_{name}"})
   registers = [{"name": "functions", "functions": api}]
-  for struct in ast["Structs"]:
+  for struct in structs:
     typename = struct["Typename"]
     fields = [field["Name"] for field in struct["Fields"]]
     utilities = [
@@ -108,6 +108,18 @@ def needed_callbacks(ast):
         result[name] = argument["Pointer"]
   return list(result.values())
 
+def gather_structs(ast):
+  result = {}
+  for function in ast["Functions"]:
+    for argument in function["Arguments"]:
+      if not argument["Kind"] in ["record_type", "union_type"]:
+        continue
+      typename = argument["Typename"]
+      if typename in result and len(argument["Fields"]) < len(result[typename]["Fields"]):
+        continue 
+      result[typename] = argument 
+  return list(result.values())  
+
 def create_context(ast):
   """
   Creates a context passed to the source.c.j2 template.
@@ -119,11 +131,12 @@ def create_context(ast):
     context: The context directory passed to the main jinja template.
   """
   attach_callback_name(ast)
+  structs = gather_structs(ast)
   context = {
     "functions": ast["Functions"],
-    "registers": create_register_context(ast),
-    "submodules": [struct["Typename"] for struct in ast["Structs"]],
-    "structs": ast["Structs"],
+    "registers": create_register_context(ast, structs),
+    "submodules": [struct["Typename"] for struct in structs],
+    "structs": structs,
     "callbacks": needed_callbacks(ast)
   }
   return context

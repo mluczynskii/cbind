@@ -132,10 +132,11 @@ def extract_type(chunk, type_node):
         - Kind (str): The type family to which the type belongs (ex. void_type or character_type),
         - Typedef (bool): Whether the type is declared using a typedef (used in structs),
         - Pointer: Underlying type information (if the type is a pointer) or None,
-        - Typename (str): The name of the type (ex. *int* or *pair_t*)
+        - Typename (str): The name of the type (ex. *int* or *pair_t*),
+        - Fields: If the type is a structure, this is a list of its fields.
   """
   (kind, traits) = type_node
-  result = {"Kind": kind, "Typedef": "unql" in traits, "Pointer": None}
+  result = {"Kind": kind, "Typedef": "unql" in traits, "Pointer": None, "Fields": None}
   if kind == "pointer_type":
       result["Pointer"], result["Typename"] = extract_ptr(chunk, traits)
       return result
@@ -143,10 +144,36 @@ def extract_type(chunk, type_node):
       (_, size_node) = traverse(chunk, traits, "size")
       if size_node["int"] == "8":
           result["Kind"] = "character_type"
-  path = ["name"] if kind == "record_type" and not result["Typedef"] else ["name", "name"]
+  path = ["name"] if kind in ["record_type", "union_type"] and not result["Typedef"] else ["name", "name"]
   (_, type_decl) = traverse(chunk, traits, *path)
   result["Typename"] = type_decl["strg"]
+  if kind in ["record_type", "union_type"]:
+     result["Fields"] = find_fields(chunk, result["Typename"])
   return result
+
+def find_fields(chunk, typename):
+  def check_owner(field_decl):
+    (_, record) = traverse(chunk, field_decl, "scpe")
+    index = field_decl["scpe"]
+    typedef = not "name" in record
+    if typedef:
+        candidates = find_nodes(chunk, "record_type") + find_nodes(chunk, "union_type")
+        for candidate in candidates:
+            if not "unql" in candidate or candidate["unql"] != index:
+                continue
+            else:
+                record = candidate
+                break
+    path = ["name", "name"] if typedef else ["name"]
+    (_, id_node) = traverse(chunk, record, *path)
+    return id_node["strg"] == typename
+  result = []
+  fields = [field for field in find_nodes(chunk, "field_decl") if check_owner(field)]
+  for field in fields:
+     name = traverse(chunk, field, "name")[1]["strg"]
+     data = extract_type(chunk, traverse(chunk, field, "type"))
+     result.append(({"Name": name, **data}, field["algn"]))
+  return [element[0] for element in sorted(result, key=lambda item: item[1])]
 
 def function_arguments(chunk):
   """
@@ -165,53 +192,6 @@ def function_arguments(chunk):
       xs.append(extract_type(chunk, traverse(chunk, prm, "valu")))
       (_, prm) = traverse(chunk, prm, "chan")
   return xs
-
-def find_structs(chunk):
-  """Get info about every struct used in a function"""
-  def find_owner(field_decl):
-    """For a given field declaration, get typename of the corresponding record"""
-    (_, record) = traverse(chunk, field_decl, "scpe")
-    index = field_decl["scpe"]
-    typedef = not "name" in record
-    if typedef:
-        candidates = find_nodes(chunk, "record_type")
-        for candidate in candidates:
-            if not "unql" in candidate or candidate["unql"] != index:
-                continue
-            else:
-                record = candidate
-                break
-    path = ["name", "name"] if typedef else ["name"]
-    (_, id_node) = traverse(chunk, record, *path)
-    return id_node["strg"], typedef
-  
-  def convert_structs(structs: dict[str, dict], typedefs: dict[str, bool]):
-    """Modify the structure of the result of extract_structs"""
-    result = []
-    for typename, fields in structs.items():
-      converted = {
-        "Typename": typename, 
-        "Fields": fields,
-        "Typedef": typedefs[typename]
-      }
-      result.append(converted)
-    return result
-  
-  fields = find_nodes(chunk, "field_decl")
-  result, typedefs = {}, {}
-  if not fields:
-    return result
-  for field in fields:
-    owner, typedef = find_owner(field)
-    name = traverse(chunk, field, "name")[1]["strg"]
-    type_ = extract_type(chunk, traverse(chunk, field, "type"))
-    info = {"Name": name, **type_}
-    if owner not in result:
-      result[owner] = [info]
-    else:
-      result[owner].append(info)
-    typedefs[owner] = typedef 
-  return convert_structs(result, typedefs)
 
 def mk_node(line):
   """
@@ -297,8 +277,8 @@ def main():
   for file in args.infile:
     lines = [" ".join(line.split()) for line in file if not re.match(r"^\s+$", line)]
     lines = coalesce(lines)
-    output = {"Functions": [], "Structs": []}
-    for chunk in chunks(lines): # First pass: collect information about API functions
+    output = {"Functions": []}
+    for chunk in chunks(lines): 
       name = function_name(chunk)
       ret_type = return_type(chunk)
       args = function_arguments(chunk)
@@ -308,11 +288,6 @@ def main():
          "Arguments": args 
       }
       output["Functions"].append(function)
-    for chunk in chunks(lines): # Second pass: collect information about structs
-      structs = find_structs(chunk)
-      if not structs:
-        continue
-      output["Structs"] = output["Structs"] + structs
   outfile.write(json.dumps(output, indent=2))
   outfile.close()
 

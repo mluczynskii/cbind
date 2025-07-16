@@ -1,0 +1,14 @@
+{#- constructor.c.j2
+  Creates a default constructor for a user-defined data structure.
+-#}
+{%- import "macros.c.j2" as macros with context -%}
+int cbind_{{ record["typename"] | split() | join("_") }}_new(lua_State *L) {
+  {{ record["typename"] }} *result = ({{ record["typename"] }} *)lua_newuserdata(L, sizeof({{ record["typename"] }}));
+  {%- for field in record["fields"] %}
+  {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, field) | indent(2) }}
+  result->{{ field["name"] }} = {{ macros.pass("arg" ~ loop.index, field) }};
+  {%- endfor %}
+  luaL_getmetatable(L, "{{ record["typename"] }}");
+  lua_setmetatable(L, -2);
+  return 1;
+}

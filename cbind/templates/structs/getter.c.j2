@@ -1,7 +1,0 @@
-{#- getter.c.j2 - Creates a getter for a user-defined data structure. -#}
-{%- import "macros.c.j2" as macros -%}
-static int cbind_{{ struct["Typename"] }}_get_{{ field["Name"] }}(lua_State *L) {
-  {{ struct["Typename"] }} *target = ({{ struct["Typename"] }} *)lua_touserdata(L, 1);
-  {{ macros.push("L", "target->" ~ field["Name"], field) }};
-  return 1;
-}

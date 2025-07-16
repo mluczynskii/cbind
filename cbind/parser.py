@@ -3,209 +3,146 @@ import re
 import json
 
 def traverse(chunk, node, *path):
-  """
-  Moves through the chunk along the path, starting from node.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-    node: Starting node.
-    *path: Names of the consecutive fields on the path.
-  
-  Raises:
-    ValueError: Provided path is empty.
-
-  Returns:
-    (name, node): A pair consisting of the final node name and the node itself.
-  """
   if not path:
     raise ValueError("traverse: Path must be non-empty")
   for fieldname in path:
       index = node[fieldname]
-      (s, node) = chunk[index]
-  return (s, node)
+      node_type, node = chunk[index]
+  return node_type, node
 
 def find_node(chunk, name: str):
-  """
-  Find FIRST node in a chunk with a given name.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-    name (str): Name of a requested node. 
-  
-  Raises:
-    ValueError: A node of a given `name` is nowhere to be found.
-
-  Returns:
-    node: A node with a given `name`.
-  """
   nodes = find_nodes(chunk, name)
   if not nodes:
     raise ValueError(f"find_node: Node named {name} not found")
   return nodes[0]
 
 def find_nodes(chunk, name):
-  """
-  Find EVERY node in a chunk with a given name.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-    name: Name of the requested nodes.
-  
-  Returns:
-    nodes: A list of nodes with a given `name` (can be empty)
-  """
   return [traits for (s, traits) in chunk if s == name]
 
 def function_name(chunk):
-  """
-  Finds the name of the function described by a chunk.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-
-  Returns:
-    name: Name of the currently processed function. 
-  """
   root = find_node(chunk, "function_decl")
-  (_, id_node) = traverse(chunk, root, "name")
+  _, id_node = traverse(chunk, root, "name")
   return id_node["strg"]
 
 def return_type(chunk):
-  """
-  Extracts function return type information in the provided chunk.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-  
-  Returns:
-    info: A dictionary better described by the `extract_type` function.
-  """
   decl_node = find_node(chunk, "function_decl")
-  return extract_type(chunk, traverse(chunk, decl_node, "type", "retn"))
+  return extract_type(chunk, *traverse(chunk, decl_node, "type", "retn"))
 
-def extract_ptr(chunk, type_node):
-  """
-  Extracts information about a pointer.
+def extract_function_pointer(chunk, type_node):
+  argument_data = []
+  return_data = extract_type(chunk, *traverse(chunk, type_node, "retn"))
+  _, prm = traverse(chunk, type_node, "prms")
+  while "chan" in prm:
+    argument_data.append(extract_type(chunk, *traverse(chunk, prm, "valu")))
+    _, prm = traverse(chunk, prm, "chan")
+  return return_data, argument_data
 
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-    type_node: Root node for the type declaration (ex. *function_type*).
+def pointer_typename(chunk, kind, type_node):
+  assert(kind == "pointer_type")
+  kind_2, type_node_2 = traverse(chunk, type_node, "ptd")
+  if kind_2 != "function_type":
+    type_data = extract_type(chunk, kind_2, type_node_2)
+    return f'{type_data["typename"]}*'
+  elif "unql" in type_node:
+    _, identifier_node = traverse(chunk, type_node, "name", "name")
+    return identifier_node["strg"]
+  return_data, argument_data = extract_function_pointer(chunk, type_node_2)
+  arguments = ",".join([data["typename"] for data in argument_data])
+  return f'{return_data["typename"]} (*)({arguments})'
 
-  Returns:
-    (data, typename): A dictionary describing the underlying type (same as `extract_type`)
-      and a full typename of the pointer.   
-  """
-  def fptr_typename(data):
-    if "unql" in type_node: 
-      (_, id_node) = traverse(chunk, type_node, "name", "name")
-      return id_node["strg"]
-    arglist = ",".join([
-      arg["Typename"] for arg in data["Arguments"]
-    ])
-    returns = data["Returns"]["Typename"]
-    return f"{returns} (*)({arglist})"
-  
-  (kind, type_decl) = traverse(chunk, type_node, "ptd")
-  if kind == "function_type":
-      data = {"Arguments": [], "Kind": kind}
-      data["Returns"] = extract_type(chunk, traverse(chunk, type_decl, "retn"))
-      (_, prm) = traverse(chunk, type_decl, "prms")
-      while "chan" in prm:
-          data["Arguments"].append(extract_type(chunk, traverse(chunk, prm, "valu")))
-          (_, prm) = traverse(chunk, prm, "chan")
-      typename = fptr_typename(data)
-  else:
-      data = extract_type(chunk, kind, type_decl)
-      typename = f"{data["Typename"]}*"
-  return data, typename
-
-def extract_type(chunk, type_node):
-  """
-  Gather information about the type described by type_node.
-
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-    type_node: Root node for the type declaration (ex. *integer_type*).
-
-  Returns:
-    dict: A dictionary describing the type
-        - Kind (str): The type family to which the type belongs (ex. void_type or character_type),
-        - Typedef (bool): Whether the type is declared using a typedef (used in structs),
-        - Pointer: Underlying type information (if the type is a pointer) or None,
-        - Typename (str): The name of the type (ex. *int* or *pair_t*),
-        - Fields: If the type is a structure, this is a list of its fields.
-  """
-  (kind, traits) = type_node
-  result = {"Kind": kind, "Typedef": "unql" in traits, "Pointer": None, "Fields": None}
-  if kind == "pointer_type":
-      result["Pointer"], result["Typename"] = extract_ptr(chunk, traits)
-      return result
+def extract_type(chunk, kind, type_node):
+  typedef = "unql" in type_node
   if kind == "integer_type":
-      (_, size_node) = traverse(chunk, traits, "size")
-      if size_node["int"] == "8":
-          result["Kind"] = "character_type"
-  path = ["name"] if kind in ["record_type", "union_type"] and not result["Typedef"] else ["name", "name"]
-  (_, type_decl) = traverse(chunk, traits, *path)
-  result["Typename"] = type_decl["strg"]
-  if kind in ["record_type", "union_type"]:
-     result["Fields"] = find_fields(chunk, result["Typename"])
-  return result
+    _, size_node = traverse(chunk, type_node, "size")
+    if size_node["int"] == "8":
+      kind = "character_type"
+  if kind == "function_type":
+    return {"kind": kind, "typename": None}
+  if kind != "pointer_type":
+    path = ["name"] if kind in ["record_type", "union_type"] and not typedef else ["name", "name"]
+    _, type_declaration = traverse(chunk, type_node, *path)
+    typename = type_declaration["strg"]
+    if not typedef and kind == "record_type":
+      typename = f'struct {typename}'
+    elif not typedef and kind == "union_type":
+      typename = f'union {typename}'
+  else:
+    typename = pointer_typename(chunk, kind, type_node)
+  return {"kind": kind, "typename": typename}
 
-def find_fields(chunk, typename):
-  def check_owner(field_decl):
-    (_, record) = traverse(chunk, field_decl, "scpe")
-    index = field_decl["scpe"]
-    typedef = not "name" in record
+def used_record_names(parsed_functions):
+  record_names = set()
+  for function in parsed_functions:
+    return_data = function["returns"]
+    if return_data["kind"] in ["record_type", "union_type"]:
+      record_names.add((return_data["kind"], return_data["typename"]))
+    for argument_data in function["arguments"]:
+      if not argument_data["kind"] in ["record_type", "union_type"]:
+        continue 
+      record_names.add((argument_data["kind"], argument_data["typename"]))
+  return record_names
+
+def extract_pointers(chunks):
+  found_pointers = set()
+  pointer_data = []
+  for chunk in chunks:
+    pointer_declarations = find_nodes(chunk, "pointer_type")
+    for pointer_declaration in pointer_declarations:
+      typename = pointer_typename(chunk, "pointer_type", pointer_declaration)
+      if typename in found_pointers:
+        continue
+      found_pointers.add(typename)
+      kind, type_node = traverse(chunk, pointer_declaration, "ptd")
+      underlying_data = extract_type(chunk, kind, type_node)
+      if kind == "function_type":
+        return_data, argument_data = extract_function_pointer(chunk, type_node)
+        underlying_data = {**underlying_data, "returns": return_data, "arguments": argument_data}
+      pointer_data.append({"typename": typename, "underlying": underlying_data})
+  return pointer_data
+    
+def extract_struct(chunks, kind, typename):
+
+  def check_owner(chunk, field_node):
+    _, record_node = traverse(chunk, field_node, "scpe")
+    record_node_idx = field_node["scpe"]
+    typedef = not "name" in record_node 
     if typedef:
-        candidates = find_nodes(chunk, "record_type") + find_nodes(chunk, "union_type")
-        for candidate in candidates:
-            if not "unql" in candidate or candidate["unql"] != index:
-                continue
-            else:
-                record = candidate
-                break
+      nodes = find_nodes(chunk, "record_type") + find_nodes(chunk, "union_type")
+      for node in nodes:
+        if not "unql" in node or node["unql"] != record_node_idx:
+          continue
+        else:
+          record_node = node 
+          break 
     path = ["name", "name"] if typedef else ["name"]
-    (_, id_node) = traverse(chunk, record, *path)
-    return id_node["strg"] == typename
-  result = []
-  fields = [field for field in find_nodes(chunk, "field_decl") if check_owner(field)]
-  for field in fields:
-     name = traverse(chunk, field, "name")[1]["strg"]
-     data = extract_type(chunk, traverse(chunk, field, "type"))
-     result.append(({"Name": name, **data}, field["algn"]))
-  return [element[0] for element in sorted(result, key=lambda item: item[1])]
+    _, identifier_node = traverse(chunk, record_node, *path)
+    return identifier_node["strg"] == typename.split()[-1] # compare with 'struct' or 'union' prefix removed
+
+  found_field_names = set()
+  record_fields = []
+  for chunk in chunks:
+    field_nodes = [field_node for field_node in find_nodes(chunk, "field_decl") if check_owner(chunk, field_node)]
+    for field_node in field_nodes:
+      field_name = traverse(chunk, field_node, "name")[1]["strg"]
+      if field_name in found_field_names:
+        continue
+      found_field_names.add(field_name)
+      field_offset = traverse(chunk, field_node, "bpos")[1]["int"]
+      field_data = {"name": field_name, **extract_type(chunk, *traverse(chunk, field_node, "type"))}
+      record_fields.append((field_data, field_offset))
+  record_fields = [item[0] for item in sorted(record_fields, key=lambda p: p[1])] # sort by offset
+  return {"kind": kind, "typename": typename, "fields": record_fields}
 
 def function_arguments(chunk):
-  """
-  Gather information about the function arguments
-  
-  Args:
-    chunk: A list of nodes relevant to the currently processed function.
-  
-  Returns:
-    xs: A list of dictionaries dictated by the `extract_type` function.
-  """
   decl_node = find_node(chunk, "function_decl")
-  xs = []
-  (_, prm) = traverse(chunk, decl_node, "type", "prms")
+  arguments = []
+  _, prm = traverse(chunk, decl_node, "type", "prms")
   while "chan" in prm:
-      xs.append(extract_type(chunk, traverse(chunk, prm, "valu")))
-      (_, prm) = traverse(chunk, prm, "chan")
-  return xs
+      arguments.append(extract_type(chunk, *traverse(chunk, prm, "valu")))
+      _, prm = traverse(chunk, prm, "chan")
+  return arguments
 
-def mk_node(line):
-  """
-  Converts a single AST line into a pair (node_name, node_parameters)
-  
-  Args:
-    line: Single line corresponding to one full (!) node description.
-
-  Raises:
-    ValueError: Provided line does not match the format of the GCC AST node.
-
-  Returns:
-    (name, node): The name of the node and it's parameters
-  """
+def make_node(line):
   if match := re.fullmatch(r"^@\d+ (?P<name>\w+) (?P<params>.*)$", line):
     traits = {}
     for arg, val in re.findall(r"([a-z]+) ?: ([^\s]+)", match.group("params")):
@@ -215,18 +152,9 @@ def mk_node(line):
         traits[arg] = val
     return (match.group("name"), traits)
   else:
-    raise ValueError(f"mk_node: Could not process line '{line}'")
+    raise ValueError(f"make_node: Could not process line '{line}'")
 
 def chunks(lines):
-  """
-  Splits the whole AST file into per-function chunks.
-
-  Args:
-    lines: Every line of the AST dump as a list.
-
-  Returns:
-    chunks: List of lists of nodes making up specific chunks.
-  """
   chunk = []
   for line in lines[2:]:
     if re.fullmatch(r"^;;.*$", line):
@@ -234,17 +162,11 @@ def chunks(lines):
         yield chunk
       chunk = []
     else:
-      node = mk_node(line)
+      node = make_node(line)
       chunk.append(node)
   yield chunk
 
 def coalesce(lines):
-  """
-  Adjusts the AST so that every node description takes up one line.
-  
-  Args:
-    lines: Every line of the AST dump as a list.
-  """
   result, acc = [], ""
   for line in lines:
     if re.match(r"^(?:@)|(?:;;).+$", line):
@@ -274,21 +196,22 @@ def main():
   )
   args = parser.parse_args()
   outfile = args.output or open("dump.json", "w")
+  parsed_ast = {"functions": [], "records": []}
   for file in args.infile:
     lines = [" ".join(line.split()) for line in file if not re.match(r"^\s+$", line)]
     lines = coalesce(lines)
-    output = {"Functions": []}
     for chunk in chunks(lines): 
       name = function_name(chunk)
-      ret_type = return_type(chunk)
-      args = function_arguments(chunk)
-      function = {
-         "Name": name,
-         "Returns": ret_type,
-         "Arguments": args 
-      }
-      output["Functions"].append(function)
-  outfile.write(json.dumps(output, indent=2))
+      return_data = return_type(chunk)
+      arguments = function_arguments(chunk)
+      function = {"name": name, "returns": return_data, "arguments": arguments}
+      parsed_ast["functions"].append(function)
+    for used_records in used_record_names(parsed_ast["functions"]):
+      record_data = extract_struct(chunks(lines), *used_records)
+      parsed_ast["records"].append(record_data)
+    pointer_data = extract_pointers(chunks(lines))
+    parsed_ast["pointers"] = pointer_data
+  outfile.write(json.dumps(parsed_ast, indent=2))
   outfile.close()
 
 if __name__ == "__main__":

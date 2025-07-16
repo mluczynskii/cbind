@@ -8,7 +8,7 @@
   name - Name of the register
   functions - An array of function names that are part of the module
 -#}
-const luaL_Reg {{ register["name"] }}[] = {
+const luaL_Reg {{ register["register_name"] }}[] = {
   {%- for function in register["functions"] %}
   {"{{ function["lua_name"] }}", {{ function["c_name"] }}},
   {%- endfor %}

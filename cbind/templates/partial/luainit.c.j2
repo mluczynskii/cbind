@@ -13,7 +13,7 @@ void *init_lua(const char *modulename) {
   luaL_openlibs(L);
   luaL_newlib(L, functions);
   {%- for module in submodules %}
-  luaopen_{{ module }}(L);
+  luaopen_{{ module | split() | join("_") }}(L);
   lua_setfield(L, -2, "{{ module }}");
   {%- endfor %}
   lua_setglobal(L, modulename);

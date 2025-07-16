@@ -1,15 +1,15 @@
 {#- wrapper.c.j2 -#}
-{%- import "macros.c.j2" as macros -%}
-{%- set returns = (function["Returns"]["Kind"] != "void_type") -%}
-int cbind_{{ function["Name"] }}(lua_State *L) {
-  {%- for argument in function["Arguments"] %}
+{%- import "macros.c.j2" as macros with context -%}
+{%- set returns = (function["returns"]["kind"] != "void_type") -%}
+int cbind_{{ function["name"] }}(lua_State *L) {
+  {%- for argument in function["arguments"] %}
   {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, argument) | indent(2) }}
   {%- endfor %}
-  {% if returns %}{{ function["Returns"]["Typename"] }} result = {% endif %}{{ function["Name"] }}(
-  {%- for argument in function.Arguments %}
+  {% if returns %}{{ function["returns"]["typename"] }} result = {% endif %}{{ function["name"] }}(
+  {%- for argument in function["arguments"] %}
     {{ macros.pass("arg" ~ loop.index, argument) | indent(4) }}{% if not loop.last %},{% endif %}
   {%- endfor %}
   );
-  {% if returns %}{{ macros.push("L", "result", function["Returns"]) }}{% endif %}
+  {% if returns %}{{ macros.push("L", "result", function["returns"]) | indent(2) }}{% endif %}
   return {{ 1 if returns else 0 }};
 }

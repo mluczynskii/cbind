@@ -1,0 +1,8 @@
+{#- setter.c.j2 - Creates a setter for a user-defined data structure. -#}
+{%- import "macros.c.j2" as macros with context -%}
+static int cbind_{{ record["typename"] | split() | join("_") }}_set_{{ field["name"] }}(lua_State *L) {
+  {{ record["typename"] }} *target = ({{ record["typename"] }} *)lua_touserdata(L, 1);
+  {{ macros.safe_fetch("L", 2, "new_value", field) | indent(2) }}
+  target->{{ field["name"] }} = {{ macros.pass("new_value", field) }};
+  return 0;
+}

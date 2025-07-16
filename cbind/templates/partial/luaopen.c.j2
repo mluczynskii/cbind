@@ -6,12 +6,12 @@
 
   submodule - Name of the relevant structure.
 -#}
-int luaopen_{{ submodule }}(lua_State *L) {
-  luaL_newmetatable(L, "{{ submodule }}");
+int luaopen_{{ module | split() | join("_") }}(lua_State *L) {
+  luaL_newmetatable(L, "{{ module }}");
   lua_pushvalue(L, -1);
   lua_setfield(L, -2, "__index");
-  luaL_setfuncs(L, {{ submodule }}lib_m, 0);
+  luaL_setfuncs(L, {{ module | split() | join("_") }}_lib_m, 0);
   lua_pop(L, 1);
-  luaL_newlib(L, {{ submodule }}_f);
+  luaL_newlib(L, {{ module | split() | join("_") }}_f);
   return 1;
 }

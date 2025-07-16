@@ -1,0 +1,7 @@
+{#- getter.c.j2 - Creates a getter for a user-defined data structure. -#}
+{%- import "macros.c.j2" as macros with context -%}
+static int cbind_{{ record["typename"] | split() | join("_") }}_get_{{ field["name"] }}(lua_State *L) {
+  {{ record["typename"] }} *target = ({{ record["typename"] }} *)lua_touserdata(L, 1);
+  {{ macros.push("L", "target->" ~ field["name"], field) | indent(2)}}
+  return 1;
+}

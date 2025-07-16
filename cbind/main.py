@@ -6,10 +6,15 @@ import sys
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 
+def split_filter(value, sep=None):
+  return value.split(sep)
+
 env = Environment(
   loader=FileSystemLoader(TEMPLATES),
   autoescape=False
 )
+
+env.filters["split"] = split_filter
 
 def apply_template(name, context):
   """
@@ -42,83 +47,67 @@ def load_ast(infile):
     print(f"Invalid JSON: {ex}", file=sys.stderr)
     sys.exit(1)
 
-def create_register_context(ast, structs):
-  """
-  """
+def create_register_context(ast):
+
   def utility_names(typename, fieldname, getter=True):
+    assert(len(typename.split()) == 1)
     suffix = f"{'get' if getter else 'set'}_{fieldname}"
     return {"lua_name": suffix, "c_name": f"cbind_{typename}_{suffix}"}
-  api = []
-  for function in ast["Functions"]:
-    name = function["Name"]
-    api.append({"lua_name": name, "c_name": f"cbind_{name}"})
-  registers = [{"name": "functions", "functions": api}]
-  for struct in structs:
-    typename = struct["Typename"]
-    fields = [field["Name"] for field in struct["Fields"]]
+
+  api_calls = []
+  for function in ast["functions"]:
+    name = function["name"]
+    api_calls.append({"lua_name": name, "c_name": f"cbind_{name}"})
+  registers = [{"register_name": "functions", "functions": api_calls}]
+  for record_data in ast["records"]:
+    typename = "_".join(record_data["typename"].split())
+    record_fields = [field["name"] for field in record_data["fields"]]
     utilities = [
-      utility_names(typename, field, getter=idx%2) 
-      for field in fields for idx in range(2)
+      utility_names(typename, field, getter=i % 2) 
+      for field in record_fields for i in range(2)
     ]
     constructor = [{"lua_name": "new", "c_name": f"cbind_{typename}_new"}]
     registers.extend([
-      {"name": f"{typename}lib_m", "functions": utilities}, 
-      {"name": f"{typename}_f", "functions": constructor}
+      {"register_name": f"{typename}_lib_m", "functions": utilities}, 
+      {"register_name": f"{typename}_f", "functions": constructor}
     ])
   return registers
 
-def attach_callback_name(ast):
-  """
-  Adds the generated callback name to each function pointer description inside the AST dump.
+def cast_to_dictionary(xs):
+  resulting_dictionary = {}
+  for x in xs:
+    typename = x["typename"]
+    resulting_dictionary[typename] = x 
+  return resulting_dictionary
 
-  Args:
-    ast: The .json dump as a python directory
-  """
-  def callback_name(data):
-    returns = data["Returns"]["Typename"][0]
-    args = [arg["Typename"][0] for arg in data["Arguments"]]
-    return f"{''.join(args)}_{returns}"
+def attach_callback_names(ast):
 
-  for function in ast["Functions"]:
-    for argument in function["Arguments"]:
-      if argument["Kind"] == "pointer_type" and argument["Pointer"]["Kind"] == "function_type":
-        name = callback_name(argument["Pointer"])
-        argument["Pointer"]["Template"] = name 
+  def callback_name(return_data, argument_data):
+    return_typename = return_data["typename"][0]
+    argument_typenames = [
+      argument["typename"][0] for argument in argument_data
+    ] 
+    return f'{return_typename}_{"".join(argument_typenames)}'
 
-def needed_callbacks(ast):
-  """
-  Creates a list of function pointer descriptions that need their helper functions.
+  for pointer in ast["pointers"]:
+    underlying = pointer["underlying"]
+    if underlying["kind"] != "function_type":
+      continue 
+    pointer["underlying"]["callback"] = callback_name(underlying["returns"], underlying["arguments"])
 
-  Args:
-    ast: The .json dump as a python directory
-  
-  Raises:
-    ValueError: The ast hasn't been passed through attach_callback_name first.
-  
-  Returns:
-    result: A list of function pointer descriptions
-  """
-  result = {}
-  for function in ast["Functions"]:
-    for argument in function["Arguments"]:
-      if argument["Kind"] == "pointer_type" and argument["Pointer"]["Kind"] == "function_type":
-        if not argument["Pointer"]["Template"]:
-          raise ValueError("Need to call attach_callback_name(ast) first")
-        name = argument["Pointer"]["Template"]
-        result[name] = argument["Pointer"]
-  return list(result.values())
 
-def gather_structs(ast):
-  result = {}
-  for function in ast["Functions"]:
-    for argument in function["Arguments"]:
-      if not argument["Kind"] in ["record_type", "union_type"]:
-        continue
-      typename = argument["Typename"]
-      if typename in result and len(argument["Fields"]) < len(result[typename]["Fields"]):
-        continue 
-      result[typename] = argument 
-  return list(result.values())  
+def create_callback_context(ast):
+  used_callback_names = set()
+  callbacks = []
+  for pointer in ast["pointers"]:
+    if pointer["underlying"]["kind"] != "function_type":
+      continue 
+    callback_name = pointer["underlying"]["callback"]
+    if callback_name in used_callback_names:
+      continue
+    used_callback_names.add(callback_name)
+    callbacks.append(pointer["underlying"])
+  return callbacks
 
 def create_context(ast):
   """
@@ -130,14 +119,14 @@ def create_context(ast):
   Returns
     context: The context directory passed to the main jinja template.
   """
-  attach_callback_name(ast)
-  structs = gather_structs(ast)
+  attach_callback_names(ast)
   context = {
-    "functions": ast["Functions"],
-    "registers": create_register_context(ast, structs),
-    "submodules": [struct["Typename"] for struct in structs],
-    "structs": structs,
-    "callbacks": needed_callbacks(ast)
+    "functions": ast["functions"],
+    "records": cast_to_dictionary(ast["records"]),
+    "pointers": cast_to_dictionary(ast["pointers"]),
+    "callbacks": create_callback_context(ast),
+    "registers": create_register_context(ast),
+    "submodules": [record["typename"] for record in ast["records"]]
   }
   return context
 

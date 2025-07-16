@@ -28,7 +28,7 @@ void close_lua(void* state) {
   lua_close(L);
 }
 
-{% for callback in callbacks %}
+{% for pointer in callbacks %}
 {% include "callbacks/callback.c.j2" %}
 {% endfor %}
 
@@ -36,11 +36,11 @@ void close_lua(void* state) {
 {% include "partial/wrapper.c.j2" %}
 {% endfor %}
 
-{%- for struct in structs %}
-{% include "structs/constructor.c.j2" %}
-{%- for field in struct.Fields %}
-{% include "structs/getter.c.j2" %}
-{% include "structs/setter.c.j2" %}
+{%- for record in records.values() %}
+{% include "records/constructor.c.j2" %}
+{%- for field in record["fields"] %}
+{% include "records/getter.c.j2" %}
+{% include "records/setter.c.j2" %}
 {% endfor %}
 {% endfor %}
 
@@ -48,7 +48,7 @@ void close_lua(void* state) {
 {% include "partial/luareg.c.j2" %}
 {% endfor %}
 
-{%- for submodule in submodules %}
+{%- for module in submodules %}
 {% include "partial/luaopen.c.j2" %}
 {% endfor %}
 

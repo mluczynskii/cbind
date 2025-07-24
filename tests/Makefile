@@ -19,7 +19,7 @@ dump.json: api.c.original
 	python3 ../cbind/parser.py api.c.original
 
 $(SDIR)/binding.c: dump.json 
-	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c --header $(IDIR)/binding.h
+	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c --header $(IDIR)/binding.h --filter filter
 
 %.o: $(SDIR)/%.c $(DEPS)
 	gcc -c -o $@ $< $(CFLAGS)

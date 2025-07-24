@@ -121,7 +121,7 @@ def create_callback_context(ast):
     callbacks.append(pointer["underlying"])
   return callbacks
 
-def create_context(ast):
+def create_context(ast, target_calls):
   """
   Creates a context passed to the source.c.j2 template.
 
@@ -131,6 +131,7 @@ def create_context(ast):
   Returns
     context: The context directory passed to the main jinja template.
   """
+  ast["functions"] = [function for function in ast["functions"] if function["name"] in target_calls]
   attach_callback_names(ast)
   context = {
     "functions": ast["functions"],
@@ -175,9 +176,11 @@ def main():
   if args.header:
     h_file = args.header
 
+  target_calls = [line.strip() for line in args.filter]
+
   for infile in args.file:
     ast = load_ast(infile)
-    template = apply_template("source.c.j2", create_context(ast))
+    template = apply_template("source.c.j2", create_context(ast, target_calls))
     with open(c_file, "w") as outfile:
       outfile.write(template)
   with open(h_file, "w") as header:

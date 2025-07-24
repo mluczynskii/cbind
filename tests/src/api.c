@@ -53,3 +53,11 @@ RGB char_color(char c) {
     default: return BLUE;
   }
 }
+
+RGB werewolf_data(monster_t mon) {
+  return mon.fur_color;
+}
+
+int vampire_data(monster_t mon) {
+  return mon.years_lived;
+}

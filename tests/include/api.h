@@ -49,4 +49,12 @@ char color_char(RGB cl);
 int is_black(enum CMYK cl);
 RGB char_color(char c);
 
+typedef union {
+  int years_lived;
+  RGB fur_color;
+} monster_t;
+
+RGB werewolf_data(monster_t mon);
+int vampire_data(monster_t mon);
+
 #endif

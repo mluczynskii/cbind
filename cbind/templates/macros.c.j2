@@ -16,7 +16,7 @@
 {% macro unsafe_fetch(state, stack_idx, variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
-{% if type["kind"] == "record_type" or (type["kind"] == "pointer_type" and pointers[typename]["underlying"]["kind"] == "record_type") -%}
+{% if type["kind"] in ["record_type", "union_type"] or (type["kind"] == "pointer_type" and pointers[typename]["underlying"]["kind"] in ["record_type", "union_type"]) -%}
 {{ typename ~ " *" ~ variable_name }} = ({{ typename }} *)lua_touserdata({{ state }}, {{ stack_idx }});
 {#-     -#}
 {%- elif type["kind"] == "character_type" -%}
@@ -52,7 +52,7 @@ void *{{ variable_name }} = alloc_callback({{ pointers[typename]["underlying"]["
 {% macro safe_fetch(state, stack_idx, variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
-{% if type["kind"] == "record_type" -%}
+{% if type["kind"] in ["record_type", "union_type"] -%}
 {{ typename ~ " *" ~ variable_name }} = ({{ typename }} *)luaL_checkudata({{ state }}, {{ stack_idx }}, "{{ typename }}"); 
 {#-     -#}
 {%- elif type["kind"] == "character_type" -%}
@@ -99,7 +99,7 @@ if (!lua_isfunction({{ state }}, {{ stack_idx }}))
 {% macro pass(variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
-{% if type["kind"] == "record_type" -%}
+{% if type["kind"] in ["record_type", "union_type"] -%}
 *({{ variable_name }})
 {#-     -#}
 {%- elif type["kind"] == "pointer_type" and pointers[typename]["underlying"]["kind"] == "function_type" -%}

@@ -1,19 +1,32 @@
-{#- callback.c.j2 -#}
+{#
+  Template: partial/callback.c.j2
+  Description: Renders a helper function used to create closures using the 
+    ffcall library. The closure data consists of lua_State* and a registry key
+    used to identify the Lua function that we want to call using lua_pcall.
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 {%- import "macros.c.j2" as macros with context -%}
+/* BEGIN: generated:binding:closures:template:{{ pointer["callback"] }} */
 void {{ pointer["callback"] }}(void *data, va_alist args) {
   closure_t *c = (closure_t *)data;
   lua_State *L = (lua_State *)c->L;
   lua_rawgeti(L, LUA_REGISTRYINDEX, c->key);
+/* BEGIN: generated:binding:closures:template:{{ pointer["callback"] }}:fetch */
   va_start_{{ pointer["returns"]["typename"] }}(args);
   {%- for argument in pointer["arguments"] %}
   {{ argument["typename"] ~ " arg" ~ loop.index }} = va_arg_{{ argument["typename"] }}(args);
   {{ macros.push("L", "arg" ~ loop.index, argument) | indent(2) }}
   {%- endfor %}
+/* END: generated:binding:closures:template:{{ pointer["callback"] }}:fetch */
   lua_pcall(L, {{ pointer["arguments"] | length }}, {{1 if pointer["returns"]["kind"] != "void_type" else 0}}, 0);
+/* BEGIN: generated:binding:closures:template:{{ pointer["callback"] }}:return */
   {% if pointer["returns"]["kind"] != "void_type" -%}
   {{ macros.unsafe_fetch("L", -1, "result", pointer["returns"]) | indent(2) }}
   va_return_{{ pointer["returns"]["typename"] }}(args, result);
   {%- else -%}
   va_return_void(args);
   {%- endif %}
+/* END: generated:binding:closures:template:{{ pointer["callback"] }}:return */
 }
+/* END: generated:binding:closures:template:{{ pointer["callback"]}} */

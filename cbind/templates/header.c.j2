@@ -1,0 +1,30 @@
+{#
+  Template: header.c.j2
+  Description: Renders the .h header file for the generated binding code
+    containing necessary helper data types and interface functions
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
+/* BEGIN: generated:header */
+#ifndef BINDING
+#define BINDING
+
+/* BEGIN: generated:header:datatypes */
+typedef struct {
+  void *L;
+  int key;
+} closure_t;
+
+typedef enum {
+  INT, SHORT, LONG, FLOAT, DOUBLE, STRING
+} ctype;
+/* END: generated:header:datatypes */
+
+/* BEGIN: generated:header:interface */
+void * init_lua(const char *module);
+int exec_script(void *state, const char *file);
+void close_lua(void *state);
+/* END: generated:header:interface */
+
+#endif
+/* END: generated:header */

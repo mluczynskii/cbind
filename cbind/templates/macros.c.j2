@@ -1,6 +1,18 @@
-{#- macros.c.j2 - A collection of useful macros used throughout the various templates. -#}
+{#
+  Template: macros.c.j2
+  Description: A collection of macros used throughout other templates, mainly for 
+    moving around data from/to the lua_State* stack. Should be imported using 
+    "import _ with context".
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 
-{# Pops a value from the stack WITHOUT invalid type checks #}
+{# 
+  Macro: macros.unsafe_fetch()
+  Description: Renders a piece of code for popping a value from the stack 
+    WITHOUT invalid type checks. This is used in the closure templates where we 
+    cannot invoke luaL_error(). 
+#}
 {% macro unsafe_fetch(state, stack_idx, variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
@@ -10,7 +22,7 @@
 {%- elif type["kind"] == "character_type" -%}
 {{ typename ~ " " ~ variable_name }} = lua_tostring({{ state }}, {{ stack_idx }})[0];
 {#-     -#}
-{%- elif type["kind"] == "integer_type" -%}
+{%- elif type["kind"] == "integer_type" or type["kind"] == "enumeral_type" -%}
 {{ typename ~ " " ~ variable_name }} = lua_tointeger({{ state }}, {{ stack_idx }});
 {#-     -#}
 {%- elif type["kind"] == "real_type" -%}
@@ -23,13 +35,20 @@ data_{{ stack_idx }}->L = (void *){{ state }};
 data_{{ stack_idx }}->key = luaL_ref({{ state }}, LUA_REGISTRYINDEX);
 void *{{ variable_name }} = alloc_callback({{ pointers[typename]["underlying"]["callback"] }}, (void *)data_{{ stack_idx }});
 {#-     -#}
+{%- elif type["kind"] == "pointer_type" -%}
+{{ typename ~ " " ~ variable_name }} = ({{ typename }})lua_touserdata({{ state }}, {{ stack_idx }});
+{#-     -#}
 {%- else -%}
 #error "Unhandled variable type"
 {%- endif %}
 {#-     -#}
 {%- endmacro %}
 
-{# Pops a value from the stack WITH invalid type checks #}
+{# 
+  Macro: macros.safe_fetch()
+  Description: Renders a piece of code for popping a value from the stack 
+    WITH invalid type checks. Any errors are reported using luaL_error(). 
+#}
 {% macro safe_fetch(state, stack_idx, variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
@@ -43,7 +62,7 @@ if (lua_isstring({{ state }}, {{ stack_idx }}))
 else 
   return luaL_error({{ state }}, "Expected character at position %d", {{ stack_idx }});
 {#-     -#}
-{%- elif type["kind"] == "integer_type" -%}
+{%- elif type["kind"] == "integer_type" or type["kind"] == "enumeral_type" -%}
 {{ typename ~ " " ~ variable_name }};
 if (lua_isinteger({{ state }}, {{ stack_idx }}))
   {{ variable_name }} = lua_tointeger({{ state }}, {{ stack_idx }});
@@ -62,13 +81,21 @@ if (!lua_isfunction({{ state }}, {{ stack_idx }}))
   return luaL_error({{ state }}, "Expected a function at position %d", {{ stack_idx }});
 {{ unsafe_fetch(state, stack_idx, variable_name, type) }}
 {#-     -#}
+{%- elif type["kind"] == "pointer_type" -%}
+{{ typename ~ " " ~ variable_name }} = ({{ typename }})lua_touserdata({{ state }}, {{ stack_idx }});
+{#-     -#}
 {%- else -%}
 #error "Unhandled variable type"
 {%- endif %}
 {#-     -#}
 {%- endmacro %}
 
-{# Pass a variable to the API call #}
+{# 
+  Macro: macros.safe_fetch()
+  Description: Renders a piece of code for passing a variable into the API call.
+    This includes necessary type casting for closures and dereferencing for records passed
+    by-value. 
+#}
 {% macro pass(variable_name, type) -%}
 {%- set typename = type["typename"] -%}
 {#-     -#}
@@ -84,10 +111,13 @@ if (!lua_isfunction({{ state }}, {{ stack_idx }}))
 {#-     -#}
 {%- endmacro %}
 
-{# Push a value onto the stack #}
+{# 
+  Macro: macros.push()
+  Description: Renders a piece of code for pushing a value to the stack. 
+#}
 {% macro push(state, variable_name, type) -%}
 {#-     -#}
-{% if type["kind"] == "integer_type" -%}
+{% if type["kind"] == "integer_type" or type["kind"] == "enumeral_type" -%}
 lua_pushinteger({{ state }}, {{ variable_name }});
 {#-     -#}
 {%- elif type["kind"] == "character_type" -%}
@@ -98,12 +128,15 @@ lua_pushnumber({{ state }}, {{ variable_name }});
 {#-     -#}
 {%- elif type["kind"] == "record_type" -%}
 {%- set typename = type["typename"] -%}
-{{ typename }} *temp_push = ({{ typename }} *)lua_newuserdata(L, sizeof({{ typename }}));
+{{ typename }} *temp_push = ({{ typename }} *)lua_newuserdata({{ state }}, sizeof({{ typename }}));
 {%- for field in records[typename]["fields"] %}
 temp_push->{{ field["name"] }} = {{ variable_name ~ "." ~ field["name"] }};
 {%- endfor %}
-luaL_getmetatable(L, "{{ typename }}");
-lua_setmetatable(L, -2);
+luaL_getmetatable({{ state }}, "{{ typename }}");
+lua_setmetatable({{ state }}, -2);
+{#-      -#}
+{%- elif type["kind"] == "pointer_type" -%}
+lua_pushlightuserdata({{ state }}, (void *){{ variable_name }});
 {#-      -#}
 {%- else -%}
 #error "Unhandled variable type"

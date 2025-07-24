@@ -1,10 +1,22 @@
-{#- wrapper.c.j2 -#}
+{#
+  Template: partial/wrapper.c.j2
+  Description: Renders a wrapper function for a single call from the target API.
+    The wrapper consists of: 
+    - Fetching the arguments from the stack
+    - Passing them into the actual call
+    - Pushing the return value onto the stack (if there is any)
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 {%- import "macros.c.j2" as macros with context -%}
 {%- set returns = (function["returns"]["kind"] != "void_type") -%}
+/* BEGIN: generated:binding:wrapper:{{ function["name"] }} */
 int cbind_{{ function["name"] }}(lua_State *L) {
+/* BEGIN: generated:binding:wrapper:{{ function["name"] }}:fetch */
   {%- for argument in function["arguments"] %}
   {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, argument) | indent(2) }}
   {%- endfor %}
+/* END: generated:binding:wrapper:{{ function["name"] }}:fetch */
   {% if returns %}{{ function["returns"]["typename"] }} result = {% endif %}{{ function["name"] }}(
   {%- for argument in function["arguments"] %}
     {{ macros.pass("arg" ~ loop.index, argument) | indent(4) }}{% if not loop.last %},{% endif %}
@@ -13,3 +25,4 @@ int cbind_{{ function["name"] }}(lua_State *L) {
   {% if returns %}{{ macros.push("L", "result", function["returns"]) | indent(2) }}{% endif %}
   return {{ 1 if returns else 0 }};
 }
+/* END: generated:binding:wrapper:{{ function["name"] }} */

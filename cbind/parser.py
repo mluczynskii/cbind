@@ -59,16 +59,58 @@ def extract_type(chunk, kind, type_node):
   if kind == "function_type":
     return {"kind": kind, "typename": None}
   if kind != "pointer_type":
-    path = ["name"] if kind in ["record_type", "union_type"] and not typedef else ["name", "name"]
+    path = ["name"] if kind in ["record_type", "union_type", "enumeral_type"] and not typedef else ["name", "name"]
     _, type_declaration = traverse(chunk, type_node, *path)
     typename = type_declaration["strg"]
     if not typedef and kind == "record_type":
       typename = f'struct {typename}'
     elif not typedef and kind == "union_type":
       typename = f'union {typename}'
+    elif not typedef and kind == "enumeral_type":
+      typename = f'enum {typename}'
   else:
     typename = pointer_typename(chunk, kind, type_node)
   return {"kind": kind, "typename": typename}
+
+def extract_enums(chunks):
+
+  def enum_name(chunk, enum_declaration):
+    typedef = "unql" in enum_declaration
+    path = ["name", "name"] if typedef else ["name"]
+    _, identifier_node = traverse(chunk, enum_declaration, *path)
+    name = identifier_node["strg"]
+    return name if typedef else f"enum {name}" 
+
+  def enum_fields(chunk, enum_declaration):
+    fields = []
+    _, prm = traverse(chunk, enum_declaration, "csts")
+    while True:
+      _, identifier_node = traverse(chunk, prm, "purp")
+      _, integer_cst = traverse(chunk, prm, "valu", "cnst")
+      fields.append({
+        "name": identifier_node["strg"],
+        "value": integer_cst["int"]
+      })
+      if not "chan" in prm:
+        break
+      _, prm = traverse(chunk, prm, "chan")
+    return fields
+
+  found_enums = set()
+  enum_data = []
+  for chunk in chunks:
+    for enum_declaration in find_nodes(chunk, "enumeral_type"):
+      if not "name" in enum_declaration:
+        continue
+      name = enum_name(chunk, enum_declaration)
+      if name in found_enums:
+        continue
+      found_enums.add(name)
+      enum_data.append({
+        "typename": name,
+        "fields": enum_fields(chunk, enum_declaration)
+      })
+  return enum_data
 
 def used_record_names(parsed_functions):
   record_names = set()
@@ -209,8 +251,8 @@ def main():
     for used_records in used_record_names(parsed_ast["functions"]):
       record_data = extract_struct(chunks(lines), *used_records)
       parsed_ast["records"].append(record_data)
-    pointer_data = extract_pointers(chunks(lines))
-    parsed_ast["pointers"] = pointer_data
+    parsed_ast["pointers"] = extract_pointers(chunks(lines))
+    parsed_ast["enums"] = extract_enums(chunks(lines))
   outfile.write(json.dumps(parsed_ast, indent=2))
   outfile.close()
 

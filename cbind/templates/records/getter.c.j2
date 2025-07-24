@@ -1,7 +1,15 @@
-{#- getter.c.j2 - Creates a getter for a user-defined data structure. -#}
+{#
+  Template: records/getter.c.j2
+  Description: Renders a getter method for an user-defined data structure, which
+    is then attached to the userdata __index field (and can be called as an object attribute).
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 {%- import "macros.c.j2" as macros with context -%}
+/* BEGIN: generated:binding:records:getter:{{ record["typename"] | split() | last }} */
 static int cbind_{{ record["typename"] | split() | join("_") }}_get_{{ field["name"] }}(lua_State *L) {
   {{ record["typename"] }} *target = ({{ record["typename"] }} *)lua_touserdata(L, 1);
   {{ macros.push("L", "target->" ~ field["name"], field) | indent(2)}}
   return 1;
 }
+/* END: generated:binding:records:getter:{{ record["typename"] | split() | last }} */

@@ -3,6 +3,7 @@ from pathlib import Path
 import json 
 import argparse
 import sys
+import os
 
 TEMPLATES = Path(__file__).resolve().parent / "templates"
 
@@ -47,6 +48,14 @@ def load_ast(infile):
     print(f"Invalid JSON: {ex}", file=sys.stderr)
     sys.exit(1)
 
+def create_enum_context(ast):
+  primitives = ["INT", "SHORT", "LONG", "FLOAT", "DOUBLE", "STRING"]
+  pointer_tags = {
+    "typename": "ctype",
+    "fields": [{"name": primitive, "value": i} for i, primitive in enumerate(primitives)]
+  }
+  return ast["enums"] + [pointer_tags]
+
 def create_register_context(ast):
 
   def utility_names(typename, fieldname, getter=True):
@@ -58,6 +67,10 @@ def create_register_context(ast):
   for function in ast["functions"]:
     name = function["name"]
     api_calls.append({"lua_name": name, "c_name": f"cbind_{name}"})
+  api_calls.extend([
+    {"lua_name": "wrap", "c_name": "cbind_wrap"},
+    {"lua_name": "unwrap", "c_name": "cbind_unwrap"}
+  ])
   registers = [{"register_name": "functions", "functions": api_calls}]
   for record_data in ast["records"]:
     typename = "_".join(record_data["typename"].split())
@@ -95,7 +108,6 @@ def attach_callback_names(ast):
       continue 
     pointer["underlying"]["callback"] = callback_name(underlying["returns"], underlying["arguments"])
 
-
 def create_callback_context(ast):
   used_callback_names = set()
   callbacks = []
@@ -126,6 +138,7 @@ def create_context(ast):
     "pointers": cast_to_dictionary(ast["pointers"]),
     "callbacks": create_callback_context(ast),
     "registers": create_register_context(ast),
+    "enums": create_enum_context(ast),
     "submodules": [record["typename"] for record in ast["records"]]
   }
   return context
@@ -139,15 +152,37 @@ def main():
   )
   parser.add_argument(
     "-o", "--output", 
-    type=argparse.FileType("w"), 
-    help="output .c file, default is 'binding.c'"
+    type=str, 
+    help="output .c filename, default is 'binding.c'"
   )
+  parser.add_argument(
+    "--header",
+    type=str,
+    help="output .h filename, default is same as the one in -o but with changed extension"
+  )
+  parser.add_argument(
+    "-f", "--filter",
+    type=argparse.FileType("r"), 
+    help="File containing newline separated function names that we want to create a binding for, by default grabs everything present in the ast dump"
+  )
+
   args = parser.parse_args()
-  outfile = args.output or open("binding.c", "w")
+  c_file = "binding.c"
+  if args.output:
+    c_file = args.output
+  base, _ = os.path.splitext(c_file)
+  h_file = base + ".h"
+  if args.header:
+    h_file = args.header
+
   for infile in args.file:
     ast = load_ast(infile)
     template = apply_template("source.c.j2", create_context(ast))
-    outfile.write(template)
+    with open(c_file, "w") as outfile:
+      outfile.write(template)
+  with open(h_file, "w") as header:
+    template = apply_template("header.c.j2", {})
+    header.write(template)
 
 if __name__ == "__main__":
   main()

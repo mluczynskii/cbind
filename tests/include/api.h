@@ -33,4 +33,20 @@ int call_2(int (*f)(int), int n);
 player_t move_player(player_t player, pair_t offset);
 player_t take_damage(player_t player, int damage);
 
+void funny(int *ptr);
+int dereference(int *ptr);
+int *grab_ptr();
+
+typedef enum {
+  RED, GREEN, BLUE
+} RGB;
+
+enum CMYK {
+  CYAN, MAGENTA = 10, YELLOW, BLACK
+};
+
+char color_char(RGB cl);
+int is_black(enum CMYK cl);
+RGB char_color(char c);
+
 #endif

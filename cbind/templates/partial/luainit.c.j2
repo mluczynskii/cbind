@@ -1,21 +1,47 @@
-{#- luainit.c.j2
-  The init_lua function creates a lua_State used to interact with
-  the Lua interpreter. When initializing, we need to create a table,
-  populate it with API wrappers and submodules for manipulating 
-  user-defined data structures. We then expose it to Lua scripts
-  under the name 'modulename'. 
-
-  submodules - An array of module names for each user-defined data
-    structure.
--#}
+{# 
+  Template: partial/luainit.c.j2 
+  Description: Renders the init_lua function used to setup the Lua interpreter with
+    appropriate functions, utilities and enumerations from the target API.
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com 
+#}
+/* BEGIN: generated:interface:init_lua */
 void *init_lua(const char *modulename) {
   lua_State *L = luaL_newstate();
   luaL_openlibs(L);
   luaL_newlib(L, functions);
-  {%- for module in submodules %}
+
+/* BEGIN: generated:interface:init_lua:records */
+  {% for module in submodules %}
+/* BEGIN: generated:interface:init_lua:records:{{ module | split() | last }} */
   luaopen_{{ module | split() | join("_") }}(L);
   lua_setfield(L, -2, "{{ module }}");
+/* END: generated:interface:init_lua:records:{{ module | split() | last }} */
+  {% endfor %}
+/* END: generated:interface:init_lua:records */
+
+  luaL_newmetatable(L, "int");
+  lua_pop(L, 1);
+
+  luaL_newmetatable(L, "string");
+  lua_pushcfunction(L, cbind_string_gc);
+  lua_setfield(L, -2, "__gc");
+  lua_pop(L, 1);
+
+/* BEGIN: generated:interface:init_lua:enums */
+  {% for enum_data in enums %}
+/* BEGIN: generated:interface:init_lua:enums:{{ enum_data["typename"] | split() | last }} */
+  lua_newtable(L);
+  {%- for field_data in enum_data["fields"] %}
+  lua_pushinteger(L, {{ field_data["value"] }});
+  lua_setfield(L, -2, "{{ field_data["name"] }}");
   {%- endfor %}
+  lua_setfield(L, -2, "{{ enum_data["typename"] | split() | last }}");
+/* END: generated:interface:init_lua:enums:{{ enum_data["typename"] | split() | last }} */
+  {% endfor %}
+/* END: generated:interface:init_lua:enums */
+  
   lua_setglobal(L, modulename);
   return (void *)L;
 }
+/* END: generated:interface:init_lua */

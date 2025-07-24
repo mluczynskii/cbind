@@ -3,7 +3,7 @@ SDIR=./src
 
 LIBS=-lm -llua -lffcall
 
-_DEPS = api.h binding.h
+_DEPS = api.h
 DEPS = $(patsubst %,$(IDIR)/%,$(_DEPS))
 
 OBJ = api.o binding.o main.o
@@ -19,7 +19,7 @@ dump.json: api.c.original
 	python3 ../cbind/parser.py api.c.original
 
 $(SDIR)/binding.c: dump.json 
-	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c
+	python3 ../cbind/main.py dump.json -o $(SDIR)/binding.c --header $(IDIR)/binding.h
 
 %.o: $(SDIR)/%.c $(DEPS)
 	gcc -c -o $@ $< $(CFLAGS)
@@ -30,7 +30,7 @@ main: $(OBJ)
 .PHONY: clean distclean
 
 clean:
-	rm -f *.o dump.json *.original src/binding.c 
+	rm -f *.o dump.json *.original src/binding.c include/binding.h
 
 distclean:
 	rm -f main

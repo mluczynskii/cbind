@@ -1,11 +1,12 @@
-{#- luaopen.c.j2
-  For each user-defined data structure, we want to initialize
-  their metatable and register setters/getters, and a default
-  constructor. The created table needs to be attached to the 
-  main module created in luainit.c.j2.
-
-  submodule - Name of the relevant structure.
--#}
+{# 
+  Template: partial/luaopen.c.j2
+  Description: Renders the luaopen_[record] function used to initialize
+    userdata metatables with generated utility methods and submodules
+    containing default constructors for user-defines data types.
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
+/* BEGIN: generated:binding:luaopen:{{ module | split() | last }} */
 int luaopen_{{ module | split() | join("_") }}(lua_State *L) {
   luaL_newmetatable(L, "{{ module }}");
   lua_pushvalue(L, -1);
@@ -15,3 +16,4 @@ int luaopen_{{ module | split() | join("_") }}(lua_State *L) {
   luaL_newlib(L, {{ module | split() | join("_") }}_f);
   return 1;
 }
+/* END: generated:binding:luaopen:{{ module | split() | last }} */

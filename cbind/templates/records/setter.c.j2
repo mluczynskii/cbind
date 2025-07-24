@@ -1,8 +1,16 @@
-{#- setter.c.j2 - Creates a setter for a user-defined data structure. -#}
+{#
+  Template: records/setter.c.j2
+  Description: Renders a setter method for an user-defined data structure, which
+    is then attached to the userdata __index field (and can be called as an object attribute).
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 {%- import "macros.c.j2" as macros with context -%}
+/* BEGIN: generated:binding:records:setter:{{ record["typename"] | split() | last }} */
 static int cbind_{{ record["typename"] | split() | join("_") }}_set_{{ field["name"] }}(lua_State *L) {
   {{ record["typename"] }} *target = ({{ record["typename"] }} *)lua_touserdata(L, 1);
   {{ macros.safe_fetch("L", 2, "new_value", field) | indent(2) }}
   target->{{ field["name"] }} = {{ macros.pass("new_value", field) }};
   return 0;
 }
+/* END: generated:binding:records:setter:{{ record["typename"] | split() | last }} */

@@ -1,14 +1,24 @@
-{#- constructor.c.j2
-  Creates a default constructor for a user-defined data structure.
--#}
+{#
+  Template: records/constructor.c.j2
+  Description: Renders a default constructor for an user-defined data structure
+    (struct/union). In Lua, we represent them using tagged userdata.
+  Author: Mateusz Łuczyński
+  Email: mateusz.luczynski02@gmail.com
+#}
 {%- import "macros.c.j2" as macros with context -%}
+/* BEGIN: generated:binding:records:constructor:{{ record["typename"] | split() | last }}*/
 int cbind_{{ record["typename"] | split() | join("_") }}_new(lua_State *L) {
   {{ record["typename"] }} *result = ({{ record["typename"] }} *)lua_newuserdata(L, sizeof({{ record["typename"] }}));
+  {%- if record["kind"] == "record_type" %}
+/* BEGIN: generated:binding:records:constructor:{{ record["typename"] | split() | last }}:fetch */
   {%- for field in record["fields"] %}
   {{ macros.safe_fetch("L", loop.index, "arg" ~ loop.index, field) | indent(2) }}
   result->{{ field["name"] }} = {{ macros.pass("arg" ~ loop.index, field) }};
   {%- endfor %}
+/* END: generated:binding:records:constructor:{{ record["typename"] | split() | last }}:fetch */
+  {%- endif %}
   luaL_getmetatable(L, "{{ record["typename"] }}");
   lua_setmetatable(L, -2);
   return 1;
 }
+/* END: generated:binding:records:constructor:{{ record["typename"] | split() | last }}*/

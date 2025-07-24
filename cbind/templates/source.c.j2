@@ -2,12 +2,14 @@
   Main binding code. Puts every wrapper together, every structure
   utilities, and the interface functions (exec_script and close_lua).
 -#}
+/* BEGIN: generated:binding */
 #include <lua.h>
 #include <lualib.h> 
 #include <lauxlib.h>
 #include <callback.h> 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "api.h"
 #include "binding.h"
 
@@ -15,6 +17,133 @@
 #define NULL 0
 #endif
 
+{#
+  Function: cbind_string_gc
+  Description: Garbage collector hook for char* pointers, since we call
+    strdup on their creation, we need to free the resource on the C side as well.
+#}
+/* BEGIN: generated:binding:cbind_string_gc */
+static int cbind_string_gc(lua_State *L) {
+  char **ptr = (char **)luaL_checkudata(L, 1, "string");
+  if (ptr && *ptr) {
+    free(*ptr);
+    ptr = NULL;
+  }
+  return 0;
+}
+/* END: generated:binding:cbind_string_gc */
+
+{#
+  Function: cbind_wrap(value, TYPE_TAG)
+  Description: Auxiliary function for creating pointers on the Lua side. It wraps the 
+    value in a tagged userdata which can then be used in calls requiring a pointer.
+    The userdata makes it so the resource is still managed on the Lua side (in contrast
+    to light userdata, used to pass C pointers around with them still being a C side
+    responsibility).
+#}
+/* BEGIN: generated:binding:cbind_wrap */
+static int cbind_wrap(lua_State *L) {
+  void *ptr;
+  switch (luaL_checkinteger(L, 2)) {
+    case (INT):
+      ptr = lua_newuserdata(L, sizeof(int));
+      *(int *)ptr = luaL_checkinteger(L, 1);
+      luaL_getmetatable(L, "int");
+      break;
+    case (SHORT):
+      ptr = lua_newuserdata(L, sizeof(short));
+      *(short *)ptr = luaL_checkinteger(L, 1);
+      luaL_getmetatable(L, "short");
+      break;
+    case (LONG):
+      ptr = lua_newuserdata(L, sizeof(long));
+      *(long *)ptr = luaL_checkinteger(L, 1);
+      luaL_getmetatable(L, "long");
+      break;
+    case (FLOAT):
+      ptr = lua_newuserdata(L, sizeof(float));
+      *(float *)ptr = luaL_checknumber(L, 1);
+      luaL_getmetatable(L, "float");
+      break;
+    case (DOUBLE):
+      ptr = lua_newuserdata(L, sizeof(double));
+      *(double *)ptr = luaL_checknumber(L, 1);
+      luaL_getmetatable(L, "double");
+      break;
+    case (STRING):
+      ptr = lua_newuserdata(L, sizeof(char *));
+      *(char **)ptr = strdup(luaL_checkstring(L, 1));
+      luaL_getmetatable(L, "string");
+      break;
+    default:
+      return luaL_error(L, "Unknown pointer type");
+  }
+  lua_setmetatable(L, -2);
+  return 1;
+}
+/* END: generated:binding:cbind_wrap */
+
+{#
+  Function: cbind_unwrap(pointer)
+  Description: Dereferences a Lua simulated pointer created using cbind_wrap by
+    comparing the metatable tag on the passed userdata.
+#}
+/* BEGIN: generated:binding:cbind_unwrap */
+static int cbind_unwrap(lua_State *L) {
+  if (!lua_isuserdata(L, 1) || !lua_getmetatable(L, 1))
+    return luaL_error(L, "Expected tagged userdata at position 1");
+  void *ptr = lua_touserdata(L, 1);
+  luaL_getmetatable(L, "int");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushinteger(L, *(int *)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  luaL_getmetatable(L, "short");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushinteger(L, *(short *)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  luaL_getmetatable(L, "long");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushinteger(L, *(long *)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  luaL_getmetatable(L, "float");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushnumber(L, *(float *)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  luaL_getmetatable(L, "double");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushnumber(L, *(double *)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  luaL_getmetatable(L, "string");
+  if (lua_rawequal(L, -1, -2)) {
+    lua_pop(L, 2);
+    lua_pushstring(L, *(char **)ptr);
+    return 1;
+  }
+  lua_pop(L, 1);
+  return luaL_error(L, "Unknown pointer data type");
+}
+/* END: generated:binding:cbind_unwrap */
+
+{#
+  Function: exec_script(state, filename)
+  Description: Executes a .lua script using the state created with init_lua.
+#}
+/* BEGIN: generated:binding:interface:exec_script */
 int exec_script(void *state, const char *filename) {
   lua_State *L = (lua_State *)state;
   int status = luaL_dofile(L, filename);
@@ -22,14 +151,21 @@ int exec_script(void *state, const char *filename) {
     fprintf(stderr, "%s\n", lua_tostring(L, -1));
   return status;
 }
+/* END: generated:binding:interface:exec_script */
 
+{#
+  Function: close_lua(state)
+  Description: Clears up resources after being done with Lua.
+#}
+/* BEGIN: generated:binding:interface:close_lua */
 void close_lua(void* state) {
   lua_State *L = (lua_State *)state; 
   lua_close(L);
 }
+/* END: generated:binding:interface:close_lua */
 
 {% for pointer in callbacks %}
-{% include "callbacks/callback.c.j2" %}
+{% include "partial/callback.c.j2" %}
 {% endfor %}
 
 {% for function in functions %}
@@ -53,3 +189,4 @@ void close_lua(void* state) {
 {% endfor %}
 
 {% include "partial/luainit.c.j2" %}
+/* END: generated:binding */

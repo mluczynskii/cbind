@@ -24,3 +24,32 @@ player_t take_damage(player_t player, int damage) {
   player.health = damage > player.health ? 0 : player.health - damage;
   return player;
 }
+
+static int test = 420;
+
+void funny(int *ptr) { *ptr = 2137; }
+int dereference(int *ptr) { return *ptr; }
+int *grab_ptr() { return &test; }
+
+char color_char(RGB cl) {
+  switch (cl) {
+    case (RED): return 'R';
+    case (GREEN): return 'G';
+    case (BLUE): return 'B';
+  }
+}
+
+int is_black(enum CMYK cl) {
+  switch (cl) {
+    case (BLACK): return 1;
+    default: return 0;
+  }
+}
+
+RGB char_color(char c) {
+  switch (c) {
+    case 'R': return RED;
+    case 'G': return GREEN;
+    default: return BLUE;
+  }
+}

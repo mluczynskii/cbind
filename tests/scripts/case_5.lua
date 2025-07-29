@@ -1,4 +1,3 @@
--- case_5: nested data-types and returning a struct
 local API = rawget(_G, "API")
 assert(API, "error: main module is not pre-loaded")
 

@@ -10,6 +10,8 @@
 #}
 {%- import "macros.c.j2" as macros with context -%}
 {%- set returns = (function["returns"]["kind"] != "void_type") -%}
+{%- set callback_indexes = function["arguments"] | callbacks -%}
+{%- set return_count = callback_indexes | length + (1 if returns else 0) -%}
 /* BEGIN: generated:binding:wrapper:{{ function["name"] }} */
 int cbind_{{ function["name"] }}(lua_State *L) {
 /* BEGIN: generated:binding:wrapper:{{ function["name"] }}:fetch */
@@ -23,6 +25,9 @@ int cbind_{{ function["name"] }}(lua_State *L) {
   {%- endfor %}
   );
   {% if returns %}{{ macros.push("L", "result", function["returns"]) | indent(2) }}{% endif %}
-  return {{ 1 if returns else 0 }};
+  {%- for idx in callback_indexes %}
+  {{ macros.push("L", "data_" ~ idx ~ "->key", {"kind": "integer_type", "typename": "int"}) | indent(2) }}
+  {%- endfor %}
+  return {{ return_count }};
 }
 /* END: generated:binding:wrapper:{{ function["name"] }} */

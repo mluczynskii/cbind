@@ -14,8 +14,189 @@
 #include "binding.h"
 
 #ifndef NULL
-#define NULL 0
+#define NULL (void *)0
 #endif
+
+{#
+  Type: node_t
+  Description: AVL tree node used to store allocated callbacks in an efficient way,
+    with the ability to free them as needed.
+#}
+/* BEGIN: generated:binding:AVL */
+typedef struct Node {
+  int key, height;
+  struct Node *left, *right;
+  void *state, *callback;
+} node_t;
+
+{#
+  Function: create_node
+  Description: Constructor for the node_t data type.
+#}
+static node_t *create_node(int key, void *state, void *callback) {
+  node_t *node = (node_t *)malloc(sizeof(node_t));
+  node->key = key;
+  node->state = state;
+  node->callback = callback;
+  node->left = NULL;
+  node->right = NULL;
+  node->height = 1;
+  return node;
+}
+
+static int get_height(node_t *node) {
+  if (node == NULL) return 0;
+  return node->height;
+}
+
+static int balance_factor(node_t *node) {
+  if (node == NULL) return 0;
+  return get_height(node->left) - get_height(node->right);
+}
+
+static int max(int a, int b) { return (a > b) ? a : b; }
+
+{#
+  Function: right_rotate
+  Description: Standard AVL right rotation with root in y.
+#}
+static node_t *right_rotate(node_t *y) {
+  node_t *x = y->left, *z = x->right;
+  x->right = y;
+  y->left = z;
+  y->height = max(get_height(y->left), get_height(y->right)) + 1;
+  x->height = max(get_height(x->left), get_height(x->right)) + 1;
+  return x;
+}
+
+{#
+  Function: left_rotate
+  Description: Standard AVL left rotation with root in x.
+#}
+static node_t *left_rotate(node_t *x) {
+  node_t *y = x->right, *z = y->left;
+  y->left = x;
+  x->right = z;
+  x->height = max(get_height(x->left), get_height(x->right)) + 1;
+  y->height = max(get_height(y->left), get_height(y->right)) + 1;
+  return y;
+}
+
+{#
+  Function: insert_node
+  Description: Standard AVL insertion.
+#}
+static node_t *insert_node(node_t *node, int key, void *state, void *callback) {
+  if (node == NULL) return create_node(key, state, callback);
+  if (key < node->key) node->left = insert_node(node->left, key, state, callback);
+  else if (key > node->key) node->right = insert_node(node->right, key, state, callback);
+  else return node;
+  node->height = max(get_height(node->left), get_height(node->right)) + 1;
+  int balance = balance_factor(node);
+  if (balance > 1 && key < node->left->key) return right_rotate(node);
+  if (balance < -1 && key > node->right->key) return left_rotate(node);
+  if (balance > 1 && key > node->left->key) {
+    node->left = left_rotate(node->left);
+    return right_rotate(node);
+  }
+  if (balance < -1 && key < node->right->key) {
+    node->right = right_rotate(node->right);
+    return left_rotate(node);
+  }
+  return node;
+}
+
+{#
+  Function: min_node
+  Description: Helper function for finding in-order successor in an AVL subtree.
+#}
+static node_t *min_node(node_t *node) {
+  node_t *current = node;
+  while (current->left != NULL)
+    current = current->left;
+  return current;
+}
+
+{#
+  Function: delete_node
+  Description: Standard AVL node deletion, when clear=true it also frees the 
+    allocated callback stored in the node with the corresponding key.
+#}
+static node_t *delete_node(node_t *node, int key, int clear) {
+  if (node == NULL) return node;
+  if (key < node->key) node->left = delete_node(node->left, key, clear);
+  else if (key > node->key) node->right = delete_node(node->right, key, clear);
+  else {
+    if (clear) {
+      luaL_unref(node->state, LUA_REGISTRYINDEX, node->key);
+      if (node->callback != NULL) {
+        free_callback(node->callback);
+        node->callback = NULL;
+      }
+    }
+    if (node->left == NULL || node->right == NULL) {
+      node_t *temp = node->left ? node->left : node->right;
+      if (temp == NULL) {
+        temp = node;
+        node = NULL;
+      } else *node = *temp;
+      free(temp);
+    } else {
+      node_t *temp = min_node(node->right);
+      node->key = temp->key;
+      node->state = temp->state;
+      node->callback = temp->callback;
+      node->right = delete_node(node->right, temp->key, 0);
+    }
+  }
+  if (node == NULL) return NULL;
+  node->height = max(get_height(node->left), get_height(node->right)) + 1;
+  int balance = balance_factor(node);
+  if (balance > 1 && balance_factor(node->left) >= 0) return right_rotate(node);
+  if (balance > 1 && balance_factor(node->left) < 0) {
+    node->left = left_rotate(node->left);
+    return right_rotate(node);
+  } 
+  if (balance < -1 && balance_factor(node->right) <= 0) return left_rotate(node);
+  if (balance < -1 && balance_factor(node->right) > 0) {
+    node->right = right_rotate(node->right);
+    return left_rotate(node);
+  }
+  return node;
+}
+
+static node_t *closure_data = NULL;
+
+{#
+  Function: delete_all
+  Description: Removes every node from the AVL tree closure_data and 
+    returns the number of callbacks cleared (because why not).
+#}
+static int delete_all() {
+  int count = 0;
+  while (closure_data != NULL) {
+    closure_data = delete_node(closure_data, closure_data->key, 1);
+    count++; 
+  }
+  return count;
+}
+
+{#
+  Function: cbind_delete_callback
+  Description: A Lua utility for disposing of not longer needed callbacks.
+    When calling any API call using a function pointer, it also returns a unique 
+    registry handle for that particular function. This function accepts that handle 
+    and frees memory associated with its corresponding callback.
+#}
+static int cbind_delete_callback(lua_State *L) {
+  int key;
+  if (lua_isinteger(L, 1))
+    key = lua_tointeger(L, 1);
+  else return luaL_error(L, "Expected callback ID at position 1");
+  closure_data = delete_node(closure_data, key, 1); 
+  return 0;
+}
+/* END: generated:binding:AVL */
 
 {#
   Function: cbind_string_gc
@@ -143,26 +324,27 @@ static int cbind_unwrap(lua_State *L) {
   Function: exec_script(state, filename)
   Description: Executes a .lua script using the state created with init_lua.
 #}
-/* BEGIN: generated:binding:interface:exec_script */
-int exec_script(void *state, const char *filename) {
+/* BEGIN: generated:binding:interface:cbind_execute */
+int cbind_execute(void *state, const char *filename) {
   lua_State *L = (lua_State *)state;
   int status = luaL_dofile(L, filename);
   if (status != 0)
     fprintf(stderr, "%s\n", lua_tostring(L, -1));
   return status;
 }
-/* END: generated:binding:interface:exec_script */
+/* END: generated:binding:interface:cbind_execute */
 
 {#
   Function: close_lua(state)
   Description: Clears up resources after being done with Lua.
 #}
-/* BEGIN: generated:binding:interface:close_lua */
-void close_lua(void* state) {
+/* BEGIN: generated:binding:interface:cbind_close */
+void cbind_close(void* state) {
+  (void)delete_all(); 
   lua_State *L = (lua_State *)state; 
   lua_close(L);
 }
-/* END: generated:binding:interface:close_lua */
+/* END: generated:binding:interface:cbind_close */
 
 {% for pointer in callbacks %}
 {% include "partial/callback.c.j2" %}

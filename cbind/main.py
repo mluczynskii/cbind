@@ -1,4 +1,4 @@
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, pass_context
 from pathlib import Path 
 import json 
 import argparse
@@ -10,12 +10,24 @@ TEMPLATES = Path(__file__).resolve().parent / "templates"
 def split_filter(value, sep=None):
   return value.split(sep)
 
+@pass_context
+def callback_filter(ctx, sequence):
+  result = []
+  for idx, element in enumerate(sequence):
+    if element["kind"] != "pointer_type":
+      continue
+    typename = element["typename"]
+    if ctx["pointers"][typename]["underlying"]["kind"] == "function_type":
+      result.append(idx + 1)
+  return result
+
 env = Environment(
   loader=FileSystemLoader(TEMPLATES),
   autoescape=False
 )
 
 env.filters["split"] = split_filter
+env.filters["callbacks"] = callback_filter
 
 def apply_template(name, context):
   """
@@ -69,7 +81,8 @@ def create_register_context(ast):
     api_calls.append({"lua_name": name, "c_name": f"cbind_{name}"})
   api_calls.extend([
     {"lua_name": "wrap", "c_name": "cbind_wrap"},
-    {"lua_name": "unwrap", "c_name": "cbind_unwrap"}
+    {"lua_name": "unwrap", "c_name": "cbind_unwrap"},
+    {"lua_name": "delete_callback", "c_name": "cbind_delete_callback"}
   ])
   registers = [{"register_name": "functions", "functions": api_calls}]
   for record_data in ast["records"]:

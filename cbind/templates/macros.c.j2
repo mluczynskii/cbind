@@ -34,6 +34,7 @@ closure_t *data_{{ stack_idx }} = (closure_t *)malloc(sizeof(closure_t));
 data_{{ stack_idx }}->L = (void *){{ state }};
 data_{{ stack_idx }}->key = luaL_ref({{ state }}, LUA_REGISTRYINDEX);
 void *{{ variable_name }} = alloc_callback({{ pointers[typename]["underlying"]["callback"] }}, (void *)data_{{ stack_idx }});
+closure_data = insert_node(closure_data, data_{{ stack_idx }}->key, (void*){{ state }}, {{ variable_name }});
 {#-     -#}
 {%- elif type["kind"] == "pointer_type" -%}
 {{ typename ~ " " ~ variable_name }} = ({{ typename }})lua_touserdata({{ state }}, {{ stack_idx }});

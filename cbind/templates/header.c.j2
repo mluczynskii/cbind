@@ -21,9 +21,9 @@ typedef enum {
 /* END: generated:header:datatypes */
 
 /* BEGIN: generated:header:interface */
-void * init_lua(const char *module);
-int exec_script(void *state, const char *file);
-void close_lua(void *state);
+void *cbind_init(const char *module);
+int cbind_execute(void *state, const char *file);
+void cbind_close(void *state);
 /* END: generated:header:interface */
 
 #endif

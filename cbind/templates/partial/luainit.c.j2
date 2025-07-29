@@ -1,24 +1,24 @@
 {# 
   Template: partial/luainit.c.j2 
-  Description: Renders the init_lua function used to setup the Lua interpreter with
+  Description: Renders the cbind_init function used to setup the Lua interpreter with
     appropriate functions, utilities and enumerations from the target API.
   Author: Mateusz Łuczyński
   Email: mateusz.luczynski02@gmail.com 
 #}
-/* BEGIN: generated:interface:init_lua */
-void *init_lua(const char *modulename) {
+/* BEGIN: generated:interface:cbind_init */
+void *cbind_init(const char *modulename) {
   lua_State *L = luaL_newstate();
   luaL_openlibs(L);
   luaL_newlib(L, functions);
 
-/* BEGIN: generated:interface:init_lua:records */
+/* BEGIN: generated:interface:cbind_init:records */
   {% for module in submodules %}
-/* BEGIN: generated:interface:init_lua:records:{{ module | split() | last }} */
+/* BEGIN: generated:interface:cbind_init:records:{{ module | split() | last }} */
   luaopen_{{ module | split() | join("_") }}(L);
   lua_setfield(L, -2, "{{ module }}");
-/* END: generated:interface:init_lua:records:{{ module | split() | last }} */
+/* END: generated:interface:cbind_init:records:{{ module | split() | last }} */
   {% endfor %}
-/* END: generated:interface:init_lua:records */
+/* END: generated:interface:cbind_init:records */
 
   luaL_newmetatable(L, "int");
   lua_pop(L, 1);
@@ -28,20 +28,20 @@ void *init_lua(const char *modulename) {
   lua_setfield(L, -2, "__gc");
   lua_pop(L, 1);
 
-/* BEGIN: generated:interface:init_lua:enums */
+/* BEGIN: generated:interface:cbind_init:enums */
   {% for enum_data in enums %}
-/* BEGIN: generated:interface:init_lua:enums:{{ enum_data["typename"] | split() | last }} */
+/* BEGIN: generated:interface:cbind_init:enums:{{ enum_data["typename"] | split() | last }} */
   lua_newtable(L);
   {%- for field_data in enum_data["fields"] %}
   lua_pushinteger(L, {{ field_data["value"] }});
   lua_setfield(L, -2, "{{ field_data["name"] }}");
   {%- endfor %}
   lua_setfield(L, -2, "{{ enum_data["typename"] | split() | last }}");
-/* END: generated:interface:init_lua:enums:{{ enum_data["typename"] | split() | last }} */
+/* END: generated:interface:cbind_init:enums:{{ enum_data["typename"] | split() | last }} */
   {% endfor %}
-/* END: generated:interface:init_lua:enums */
+/* END: generated:interface:cbind_init:enums */
   
   lua_setglobal(L, modulename);
   return (void *)L;
 }
-/* END: generated:interface:init_lua */
+/* END: generated:interface:cbind_init */

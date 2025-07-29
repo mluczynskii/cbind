@@ -485,7 +485,53 @@ An example of the produced output should be enough of a clarification for the st
       }
     \end{lstlisting}
     \subsection{Closures with \textit{GNU libffcall}}
+      Since closures in the form we just described are not present in standard C, we have to resort to another form of achieving them.
+      The \href{https://www.gnu.org/software/libffcall/}{\textit{GNU libffcall}} library does just that.
+      We can create a closure by calling the \texttt{alloc\_callback} function and supplying it with an address of a template function and a pointer to the data that we want inside its environment.
+      This call creates a small piece of architecture-dependent machine code using \texttt{mmap} --- a trampoline --- that behaves as a regular function pointer.
+      Its job is to provide the handler (the function we passed to \texttt{alloc\_callback}) with the supplied arguments (at the time of calling it), as well as the previously passed closure data.
+      After being done with the created closure, we can clear the memory it occupies by calling \texttt{free\_callback} on the pointer returned from the initial call.
 
+      To prevent memory leaks, each time a closure is created the binding code stores every pointer relevant to it, so that they can later be properly freed.
+      The storage is implemented using an AVL tree for maximum efficiency.
+      Since functions called from Lua can return many values, each API call that uses function pointers returns the registry keys associated with closures created during its execution.
+      An additional function exposed to the Lua environment called \texttt{delete\_callback} can be called to prematurely free the memory related to its single argument --- the aformentioned registry key.
+      The whole tree is destroyed upon calling the main interface function \texttt{cbind\_close}.
+
+      The library also provides an interface for creating functions with variable argument/return count, but that is more of an obstacle in this scenario.
+      It doesn't help that the documentation is really brief and does not go into any details either, but looking into the source code and some experimentation proved that it is suitable for the job.
+      It was also already indirectly mentioned, but its worth noting explicitly that for it to work, it needs to be able to allocate pages that are both \textit{writable} and \textit{executable}.
+
+  \section{Regular pointers}
+    When dealing with pointers to memory allocated on the C side, Lua offers yet another special type --- \textit{light userdata}.
+    \begin{displaycquote}{pil4}
+      A light userdata is a value that represents a C pointer, that is, a \texttt{void*} value. 
+      A light userdata is a value, not an object; we do not create them (in the same way that we do not create numbers). 
+      To put a light userdata onto the stack, we call \texttt{lua\_pushlightuserdata}:
+
+      \begin{center}
+      \texttt{void lua\_pushlightuserdata (lua\_State *L, void *p);}
+      \end{center}
+      
+      Despite their common name, light userdata and full userdata are quite different things. 
+      Light userdata are not buffers, but bare pointers. 
+      They have no metatables. 
+      Like numbers, light userdata are not managed by the garbage collector.
+    \end{displaycquote}
+    Functions returning a pointer should then encapsulate them inside a light userdata container.
+    The rule to follow here pretty much comes down to avoiding mixing responsibility --- resources managed by C should stay managed by it, and vice versa.
+    Using light userdata we can pass around C-managed pointers to other API calls.
+
+    If we want to create a pointer on the Lua side, we go back to full userdata.
+    Since we don't want to allocate extra resources on the C side, all we do is wrap the requested value in a userdata container, and return it back to Lua.
+    This way, it stays managed by the Lua environment. 
+    An extra utility function exposed by the binding code serves that purpose by additionally attaching a metatable tag to the created pointer.
+    That way, when we need to dereference the value, we can cast the pointer to a proper data type.
+    \begin{lstlisting}[language={[5.2]Lua}, caption=Creating an \texttt{int} pointer in a \texttt{.lua} script]
+      local value = 42
+      local ptr = API.wrap(value, API.ctype.INT)
+      -- assert(API.unwrap(ptr) == 42)
+    \end{lstlisting}
   \section{Error handling}
     When dealing with the Lua C API, the responsibility of type checking falls on the C programmer.
     Failure to do so could lead to serious runtime errors.
@@ -505,11 +551,20 @@ An example of the produced output should be enough of a clarification for the st
     A single drawback is that we seemingly can't propagate the failure reason in any way, even though we have access to it.
     Other than that, the fact that something went wrong can be reflected in the return value, which is the way most code in C does it anyway.
 
-
   \section{Exposing the interface}
+    The main interface exposed by the binding code consists of three calls: \texttt{cbind\_init}, \texttt{cbind\_execute} and \texttt{cbind\_close}.
+    Before any interaction with Lua scripts can happen, the main C application needs to call \texttt{cbind\_init}.
+    It is responsible for opening required libraries and initializing the environment, populating it with created wrappers and utility functions.
+    Calling it returns a handler which can then be used in the other two calls.
+    Its type is purposefully \texttt{void*}, so that the potential user doesn't need to worry about the innerworking of the binding code.
+
+    The \texttt{cbind\_execute} call is used to execute \texttt{.lua} scripts in the created environment.
+    It returns a status indicating whether or not everything went smoothly.
+
+    Lastly, the \texttt{cbind\_close} call is used to finalize interaction with the Lua interpreter.
+    After calling it, the environment is no longer usable, which consequently means that every registered callback gets destroyed.
+    It makes sure that the extra allocated memory is freed properly, and that the environment gets gracefully closed.
 \chapter{Example usage}
-\chapter{Conclusion}
-  \section{Possible further development}
 
 \begin{thebibliography}{42}
   \bibitem{pil4}

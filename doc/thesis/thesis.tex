@@ -484,7 +484,7 @@ An example of the produced output should be enough of a clarification for the st
         va_return_int(args, result);
       }
     \end{lstlisting}
-    \subsection{Closures with \textit{GNU libffcall}}
+    \subsection{Closures with \textit{GNU libffcall}}\label{ffcall_closures}
       Since closures in the form we just described are not present in standard C, we have to resort to another form of achieving them.
       The \href{https://www.gnu.org/software/libffcall/}{\textit{GNU libffcall}} library does just that.
       We can create a closure by calling the \texttt{alloc\_callback} function and supplying it with an address of a template function and a pointer to the data that we want inside its environment.
@@ -564,37 +564,109 @@ An example of the produced output should be enough of a clarification for the st
     Lastly, the \texttt{cbind\_close} call is used to finalize interaction with the Lua interpreter.
     After calling it, the environment is no longer usable, which consequently means that every registered callback gets destroyed.
     It makes sure that the extra allocated memory is freed properly, and that the environment gets gracefully closed.
-\chapter{Example usage}
-  To see the toolchain abilities in action, we can go through an extremely simple example program.
-  The whole application is supposed to look like a very early prototype of a video game, written using the \href{https://www.libsdl.org/}{SDL2} library.
-  In it, the player (represented by a green rectangle) can navigate a 5$\times$5 grid and execute their signature attack (represented by other rectangles flashing).
-  The attack pattern and its color are dictated by two variables: \lstinline[language=c]|color_t *attack_color| and \lstinline[language=c]|int (*attack_pattern)(int, int)|.
-  The program is written in a way so that these two variables are to be set by an external \texttt{.lua} script.
-  For this purpose, several API calls were created: one for setting the color of the attack, and one for setting the attack pattern itself.
-  Additional calls supply the scripts with the current player position and the size of the grid (so it can be changed freely without breaking any logic depending on it).
-  \begin{lstlisting}[language=c, caption=\texttt{color\_t type definition}]
-    typedef struct {
-      short red, green, blue;
-      short alpha;
-    } color_t;
-  \end{lstlisting}
 
-  The type of the \texttt{attack\_pattern} variable suggests that the pattern is represented by a characteristic function of a set of coordinates.
-  When prompted with the $x$ and $y$ grid coordinates, it tells the main program whether or not the corresponding square is being attacked by the player.
-  The function can depend on the player's position, but it can also ignore it completely when going through its logic.
-  \begin{lstlisting}[language={[5.2]Lua}, caption=Example pattern dictating function]
-    function pat(x, y) -- ``cross'' shape around the player
-      local posx, posy = API.get_posx(), API.get_posy()
-      if math.abs(x-posx) + math.abs(y-posy) == 1 then 
-        return 1
-      else return 0 end
-    end 
-  \end{lstlisting}
+\chapter{The project repository}
+  Lastly, we will go over the project structure and the contents of the repository its contained in.
+
+  The project repository consists of following directories/files:
+  The \texttt{cbind} directory contains the source code for the parser and the binding generator, with the \texttt{cbind/templates} subdirectory containing all C templates used the generation process.
+  Next up, the \texttt{doc} directory contains the \texttt{thesis.tex} file used in the creation of this PDF, with the PDF itself in the same directory.
+  The \texttt{examples} directory contains an example application used to demonstrate the abilities of the toolchain, and is described later in this chapter.
+  After that, there is the \texttt{tests} directory, consisting of the \texttt{tests/include}, \texttt{tests/scripts} and \texttt{tests/src} subdirectories, as well as a \texttt{Makefile} and a validation script \texttt{validate.sh}.
+  The listed directories contain the header files for the tested API, its implementation (inside the \texttt{tests/src} directory) and several test cases in the form of \texttt{.lua} scripts (the \texttt{tests/scripts} directory).
+  In the \texttt{tests/src} directory, there is also a main application code, that is used to run the aforementioned scripts.
+  Lastly, in the project's root directory, there is a \texttt{README.md} file going over the core workings of the project, as well as a \texttt{Dockerfile} used in automatic testing.
+
+  The approach to testing is closest to the \textit{Test Driven Development} philosophy, as the test cases were created before implementing each major feature of the binding generator, and were the deciding factor in determining whether or not the feature works.
+  As the repository is stored on \texttt{GitHub}, the \textit{GitHub Actions} faculty was integrated into the project.
+  This means, that on every push, the tests are automatically ran inside a docker container to confirm that everything works as expected in a fresh environment.
+  The details for the way that is achieved can be found inside the \texttt{.github} directory and the mentioned \texttt{Dockerfile}.
 
 
-  The interaction with the program is done by pressing certain keys on the keyboard --- arrow keys are for movement, the space bar launches the currently set attack and the $r$ key is used to dynamically reload the settings.
-  The $r$ key is especially interesting, as it allows us to change the attack patterns without closing the game window, simply by changing the code contained in the \texttt{script.lua} file.
-  After executing the parser and the binding generator on the existing source files, we end up with the binding code consisting of roughly \textit{600 lines}, allowing us to freely call the aforementioned API calls, and play around with the attack settings.
+  \section{Example usage}
+    To see the toolchain abilities in action, we can go through an extremely simple example program.
+    The whole application is supposed to look like a very early prototype of a video game, written using the \href{https://www.libsdl.org/}{SDL2} library.
+    In it, the player (represented by a green rectangle) can navigate a 5$\times$5 grid and execute their signature attack (represented by other rectangles flashing).
+    The attack pattern and its color are dictated by two variables: \lstinline[language=c]|color_t *attack_color| and \lstinline[language=c]|int (*attack_pattern)(int, int)|.
+    The program is written in a way so that these two variables are to be set by an external \texttt{.lua} script.
+    For this purpose, several API calls were created: one for setting the color of the attack, and one for setting the attack pattern itself.
+    Additional calls supply the scripts with the current player position and the size of the grid (so it can be changed freely without breaking any logic depending on it).
+    \begin{lstlisting}[language=c, caption=\texttt{color\_t type definition}]
+      typedef struct {
+        short red, green, blue;
+        short alpha;
+      } color_t;
+    \end{lstlisting}
+
+    The type of the \texttt{attack\_pattern} variable suggests that the pattern is represented by a characteristic function of a set of coordinates.
+    When prompted with the $x$ and $y$ grid coordinates, it tells the main program whether or not the corresponding square is being attacked by the player.
+    The function can depend on the player's position, but it can also ignore it completely when going through its logic.
+    \begin{lstlisting}[language={[5.2]Lua}, caption=Example pattern dictating function]
+      function pat(x, y) -- cross shape around the player
+        local posx, posy = API.get_posx(), API.get_posy()
+        if math.abs(x-posx) + math.abs(y-posy) == 1 then 
+          return 1
+        else return 0 end
+      end 
+    \end{lstlisting}
+
+    The interaction with the program is done by pressing certain keys on the keyboard --- arrow keys are for movement, the space bar launches the currently set attack and the $r$ key is used to dynamically reload the settings.
+    The $r$ key is especially interesting, as it allows us to change the attack patterns without closing the game window, simply by changing the code contained in the \texttt{script.lua} file.
+    After executing the parser and the binding generator on the existing source files, we end up with the binding code consisting of roughly \textit{600 lines}, allowing us to freely call the aforementioned API calls, and play around with the attack settings.
+
+    \subsection{Running the example}
+      To run the example application yourself you should follow this simple guide.
+      First of, we will go through the process of installing the dependencies.
+      Make sure that your system has the standard compilation tools available to use --- mainly those contained in packages like \texttt{base-devel}.
+      A Python installation should also be present.
+
+      For Python, the required libraries are listed under the \texttt{requirements.txt} file --- to install them using \texttt{pip}, the \texttt{pip install -r requirements.txt} command is used inside the root directory.
+      For convenience reasons, this command should be ran inside the Python's \textit{virtual environment}.
+      To create such environment, the \texttt{python -m venv /path/to/new/virtual/environment} command should be ran, just as the official \href{https://docs.python.org/3/library/venv.html}{documentation} says.
+      Once created, run the \texttt{source <venv>/bin/activate} to activate it.
+      Installing Python packages inside the virtual environment prevents clashes with already installed packages, and polluting the base environment.
+
+      Next up, we will need a Lua installation.
+      Since the building process is extremely simple and is actually the recommended approach, one should follow the building instructions listed on the \href{https://www.lua.org/download.html}{official site}.
+      After installing Lua, the \texttt{-llua} linker flag becomes available --- we will need it in the compilation process.
+
+      For C dependencies we will need the \href{https://www.gnu.org/software/libffcall/}{\texttt{libffcall}} library and the \href{https://www.libsdl.org/}{\texttt{SDL2}} library installed.
+      Both of those should be available for installation through the systems package manager --- commands like \texttt{pacman -S sdl2 ffcall}.
+      Once again, we will need the \texttt{-lffcall} and \texttt{-lSDL2} linker flags.
+      
+      After installing the listed dependencies, navigate to the \texttt{examples} subdirectory, and run the \texttt{make compile} command.
+      This will create the \texttt{examples/main} executable which can then be freely played around with.
+      The process of running tests is similiar in a way that it need the same set of dependencies installed (besides the \texttt{SDL2} library, which is only used in the example program).
+      To run them, navigate to the \texttt{tests} directory and execute the \texttt{validate.sh} script.
+      This will run each written test and display the number of successful ones in the terminal.
+
+\chapter{Conclusion}
+  During my work on the project, I have successfully implemented a toolchain consisting of two independent components: a GCC abstract syntax tree parser and a binding generator operating on its result.
+  The toolchain was tested against variety of scenarios and corner cases.
+  An example application was also provided to show, that it can be proven useful in certain scenarios
+
+  The first toolchain component (the parser) required the understanding of a complex, yet comprehensible compiler representation of the target library code.
+  It also required choosing the one most suitable, as there were a lot of them available.
+  Many experiments driven by trial and error helped to make the chosen representation clearer and ultimately useful in the process of generating the binding code.
+  The intermediate result produced by the parser was also carefully designed, so it could cooperate with the binding generator as best as it could.
+
+  The second component required knowledge about the abilities of the Lua C API, and some creativity when dealing with the problem of mapping C types to those available in Lua.
+  This part was also riddled with experimentation, which had the goal of measuring what's actually possible, and what's not.
+  These experiments lead to an extensive usage of the offered API, and some interesting solutions --- like using closures.
+
+  \section{Possible further development}
+    As mentioned somewhere in the beginning, the parser was developed as an interchangeable component from the start.
+    A nice addition to the toolchain would be to create additional ones for other compilers, mainly \texttt{clang}, which offers an extremely convenient option of dumping the AST in a complete, readable way.
+    The ability to switch between compilers would be beneficial for the user, who would not be forced to use one over another.
+    The additional parser could also help deal with some problems arising with the use of the GCC's AST --- like ones related to structs (their whole definition may not be present in the AST given very specific conditions, an issue which was omitted during previous chapters).
+
+    Another improvement that could be implemented relates to the usage of multiple threads.
+    As of now, the binding may not be thread-safe, specifically when working with callbacks.
+    This is because the callback storage described in subsection about closures (\ref{ffcall_closures}) does not account for multi-threading.
+    Additionally, some logging functionality could be introduced to the binding code, to optionally report problems arising from incorrectly typed callbacks.
+
+    Lastly, everything related to regular pointer values could possibly be improved over the need to manually specify the type of the pointer.
+    As of now, this can be seen as just an inconvenience for the user, but can also possibly cause some problems when used incorrectly.
 
 \begin{thebibliography}{42}
   \bibitem{pil4}

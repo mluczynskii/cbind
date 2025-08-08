@@ -1,0 +1,6 @@
+set_attack_color
+set_attack_pattern
+get_grid_size
+get_default_color
+get_posx
+get_posy

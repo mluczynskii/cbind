@@ -565,6 +565,36 @@ An example of the produced output should be enough of a clarification for the st
     After calling it, the environment is no longer usable, which consequently means that every registered callback gets destroyed.
     It makes sure that the extra allocated memory is freed properly, and that the environment gets gracefully closed.
 \chapter{Example usage}
+  To see the toolchain abilities in action, we can go through an extremely simple example program.
+  The whole application is supposed to look like a very early prototype of a video game, written using the \href{https://www.libsdl.org/}{SDL2} library.
+  In it, the player (represented by a green rectangle) can navigate a 5$\times$5 grid and execute their signature attack (represented by other rectangles flashing).
+  The attack pattern and its color are dictated by two variables: \lstinline[language=c]|color_t *attack_color| and \lstinline[language=c]|int (*attack_pattern)(int, int)|.
+  The program is written in a way so that these two variables are to be set by an external \texttt{.lua} script.
+  For this purpose, several API calls were created: one for setting the color of the attack, and one for setting the attack pattern itself.
+  Additional calls supply the scripts with the current player position and the size of the grid (so it can be changed freely without breaking any logic depending on it).
+  \begin{lstlisting}[language=c, caption=\texttt{color\_t type definition}]
+    typedef struct {
+      short red, green, blue;
+      short alpha;
+    } color_t;
+  \end{lstlisting}
+
+  The type of the \texttt{attack\_pattern} variable suggests that the pattern is represented by a characteristic function of a set of coordinates.
+  When prompted with the $x$ and $y$ grid coordinates, it tells the main program whether or not the corresponding square is being attacked by the player.
+  The function can depend on the player's position, but it can also ignore it completely when going through its logic.
+  \begin{lstlisting}[language={[5.2]Lua}, caption=Example pattern dictating function]
+    function pat(x, y) -- ``cross'' shape around the player
+      local posx, posy = API.get_posx(), API.get_posy()
+      if math.abs(x-posx) + math.abs(y-posy) == 1 then 
+        return 1
+      else return 0 end
+    end 
+  \end{lstlisting}
+
+
+  The interaction with the program is done by pressing certain keys on the keyboard --- arrow keys are for movement, the space bar launches the currently set attack and the $r$ key is used to dynamically reload the settings.
+  The $r$ key is especially interesting, as it allows us to change the attack patterns without closing the game window, simply by changing the code contained in the \texttt{script.lua} file.
+  After executing the parser and the binding generator on the existing source files, we end up with the binding code consisting of roughly \textit{600 lines}, allowing us to freely call the aforementioned API calls, and play around with the attack settings.
 
 \begin{thebibliography}{42}
   \bibitem{pil4}

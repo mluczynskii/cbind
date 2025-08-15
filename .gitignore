@@ -2,6 +2,7 @@
 *.json
 /tmp
 .vscode
+*.zip
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

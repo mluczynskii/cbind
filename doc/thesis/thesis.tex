@@ -286,7 +286,7 @@ A potential developer interested in extending the tool for another kind of compi
 First of, the top-level JSON object should contain four fields: \texttt{functions}, \texttt{records}, \texttt{pointers} and \texttt{enums}. 
 The value of the first one should be a list of objects containing information about desired API calls.
 Each object should respect the following convention:
-\begin{lstlisting}[language=json, caption=Example API \texttt{.json} function description]
+\begin{lstlisting}[language=json, caption=Example function \texttt{int sum(pair\_t p)} description]
   {
     "name": "sum",
     "returns": {
@@ -424,7 +424,7 @@ An example of the produced output should be enough of a clarification for the st
     \end{lstlisting}
   \section{Simple types}
     Handling simple C types is just as the name suggests --- simple.
-    Types like \texttt{int}, \texttt{float}, \texttt{char} and \texttt{const char*} (the \texttt{const} part is important!), but also their extensions like \texttt{long} and \texttt{double} translate pretty much directly into our binding code.
+    Types like \texttt{int}, \texttt{float}, \texttt{char} and \texttt{const char*}, but also their extensions like \texttt{long} and \texttt{double} translate pretty much directly into our binding code.
     For all kind of integers, we can utilize the \texttt{lua\_tointeger} call, to fetch the ``integer compatible'' value from the virtual stack --- this means that the call will work for real numbers as well as strings convertible to numbers.
     For real numbers we have \texttt{lua\_tonumber} call, which works in the same way.
     For strings, we can use \texttt{lua\_tostring} function. 
@@ -452,12 +452,18 @@ An example of the produced output should be enough of a clarification for the st
     This is important for type checking --- after all, so far all records are represented using the same \texttt{userdata} type.
     This is solved using \textit{metatables} --- from \textit{Programming in Lua} again:
     \begin{displaycquote}{pil4}
+      Metatables allow us to change the behavior of an [userdata] 
+      For instance, using metatables, we can define how Lua computes the expression a+b, where a and b are [userdata]. 
+      Whenever Lua tries to add two [userdata], it checks whether either of them has a metatable and whether that metatable has an \texttt{\_\_add} field. 
+      If Lua finds this field, it calls the corresponding value (the so-called metamethod, which should be a function) to compute the sum.
+    \end{displaycquote}
+    \begin{displaycquote}{pil4}
       The usual method to distinguish one type of userdata from another is to create a unique metatable for that type.
       Every time we create a userdata, we mark it with the corresponding metatable; every time we get a userdata, we check whether it has the right metatable. 
       Because Lua code cannot change the metatable of a userdata, it cannot deceive these checks.
     \end{displaycquote}
     We can mark an userdata with a metatable during the process of its creation, that is inside the default constructor.
-    The process of creating such metatable as well as enabling the object-oriented access mentioned before will be handled by helper function for the initialization function, which is part of the main interface.
+    The process of creating such metatable as well as enabling the object-oriented access mentioned before will be handled by a helper function for the initialization function, which is part of the main interface.
 
   \section{Function pointers}
     This is by far the most interesting part in the whole process.
@@ -486,7 +492,7 @@ An example of the produced output should be enough of a clarification for the st
     Multiple references don't solve anything as well --- we still wouldn't know which one to choose.
 
     A solution presents itself in the form of \textit{closures}.
-    A closure is a function along with the environment required to run it.
+    A closure~\cite{closure} is a function along with the environment required to run it.
     If we could create such closure during runtime, using the templates from the original idea and passing a reference to the Lua function inside their environment, we could achieve what we want.
     \begin{lstlisting}[language=c, caption=Example of a generated template function for an \texttt{int (*)(int)} callback]
       void i_i(void *data, va_alist args) {
@@ -561,6 +567,7 @@ An example of the produced output should be enough of a clarification for the st
     As such we would like to have a mechanism for ensuring that arguments passed from Lua won't cause any problems on the C side.
 
     A standard way of informing Lua that something went wrong, is invoking the \texttt{luaL\_error} function with the appropriate error message.
+    This raises a runtime error within a Lua script that causes it.
     Even though it never returns, it's customary to invoke it inside a \texttt{return} statement.
     We are also equipped with a set of \texttt{lua\_check*} functions, which we can supply with an appropriate stack index, to check whether or not the value stored there satisfies our needs.
     This is straightfoward for simple types; for records we can use a function called \texttt{luaL\_checkudata} which also accepts a metatable name.
@@ -581,12 +588,34 @@ An example of the produced output should be enough of a clarification for the st
     Calling it returns a handler which can then be used in the other two calls.
     Its type is purposefully \texttt{void*}, so that the potential user doesn't need to worry about the innerworking of the binding code.
 
+    \begin{lstlisting}[caption=Interface singatures, language=c]
+      void *cbind_init(const char *module);
+      int cbind_execute(void *state, const char *file);
+      void cbind_close(void *state);
+    \end{lstlisting}
+
     The \texttt{cbind\_execute} call is used to execute \texttt{.lua} scripts in the created environment.
     It returns a status indicating whether or not everything went smoothly.
 
     Lastly, the \texttt{cbind\_close} call is used to finalize interaction with the Lua interpreter.
     After calling it, the environment is no longer usable, which consequently means that every registered callback gets destroyed.
     It makes sure that the extra allocated memory is freed properly, and that the environment gets gracefully closed.
+
+    \begin{lstlisting}[caption=Example interaction with the interface, language=c]
+      #include <stdio.h>
+      #include <stdlib.h>
+      #include "binding.h"
+
+      int main(int argc, char *argv[]) {
+        const char *file = argv[1];
+        void *state = cbind_init("API");
+        int status = cbind_execute(state, file);
+        cbind_close(state);
+        if (status != 0)
+          exit(EXIT_FAILURE);
+        exit(EXIT_SUCCESS);
+      }
+    \end{lstlisting}
 
 \chapter{The project repository}
   Lastly, we will go over the project structure and the contents of the repository its contained in.
@@ -731,6 +760,11 @@ An example of the produced output should be enough of a clarification for the st
     Python Software Foundation,
     \emph{venv --- Creation of virtual environments},
     Web: \url{https://docs.python.org/3/library/venv.html}.
+
+  \bibitem{closure}
+    Wikimedia Foundation,
+    \emph{Closure (computer programming)},
+    Web: \url{https://en.wikipedia.org/wiki/Closure_(computer_programming)}.
 \end{thebibliography}
 
 \end{document}
